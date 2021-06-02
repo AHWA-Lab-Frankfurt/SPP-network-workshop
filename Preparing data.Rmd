@@ -1,0 +1,107 @@
+---
+title: "How to get a rectangular data matrix into shape for network analysis"
+author: "NG, JMPS"
+date: "2 6 2021"
+output: html_document
+---
+```{r libraries}
+# this code contains all the libraries we need to use in this process. If they are not present, use install.packages("pacakge x") to get them.
+library(tidyverse)
+```
+
+We will usually start our work with what is called a "rectangular" matrix of archaeological sites and finds. Rectangular in this case means that the row and column names are not identical. There are two ways of getting this data ready for network analysis. The first is a square matrix or adjacency matrix, the second is an edge list. We will here show the stepts to get both of these products in R.
+
+```{r get data}
+# Here we get a dataset from the archdata repository. If you do not have this on your R installation yet, run:
+# install.packages("archdata")
+library(archdata) 
+data("EIAGraves")
+
+#Visually check the data:
+View(EIAGraves)
+```
+
+EIAGraves is a dataset of 52 different ceramic types in 6 large tombs and 10 broadly contemporaneous groups of tombs. To find out more, run this command
+```{r find out about dataset}
+help("EIAGraves")
+```
+
+# Adjacency Matrices
+
+The first step for this data will be to tell R that the column "Type" contains the names of the rows. Then we will transpose the table, making the columns into the rows and vice-versa.
+```{r column to row names}
+EIAGraves <- EIAGraves %>% 
+  column_to_rownames(var = "Type") %>%  # turn "type column into rownames
+  t()  # transpose
+
+#Visually check the data:
+View(EIAGraves)
+```
+
+What we want now is a so-called square matrix, where the rows and columns are the same...
+based on co-presence
+
+
+```{r co-presence (after Peeples 2017, http://mattpeeples.net/netstats.html)}
+co.p <- function(x, thresh = 0.1) {
+    # create matrix of proportions
+    temp <- prop.table(as.matrix(x), 1)
+    # define anything with greater than or equal to 0.1 as present (1)
+    temp[temp >= thresh] <- 1
+    # define all other cells as absent (0)
+    temp[temp < 1] <- 0
+    # matrix algebraic calculation to find co-occurence (%*% indicates matrix
+    # multiplication)
+    out <- temp %*% t(temp)
+    return(out)
+}
+
+# run the function
+gravesP <- co.p(EIAGraves)
+
+#Visually check the new table:
+View(gravesP)
+```
+
+
+# Edge and node list format
+It is sometimes easier to append and edit the network data when it is stored in two lists: an edge list, which has the connections and their attributes, and a node list, which stores the attributes of the nodes.
+
+
+
+```{r co-presence edgelist}
+
+```
+
+```{r make edge and node list}
+
+make_edgelist <- function(data, edge_type, edge_subtype){
+  data <- data%>% select_if(function(x){!all(is.na(x))})  #only select those coumns that have values in them
+
+  data_long <- data %>% pivot_longer(-1, names_to = "name") %>% rename(Var1 = 1)  #make data long
+
+  sites <- data %>%                                                    #get all pairs of sites
+    expand(x = .[[1]], y = .[[1]]) %>%
+    filter(x != y)%>%   rowwise() %>%
+    mutate(id = paste0(sort(c(x, y)), collapse = " ")) %>%
+    distinct(id, .keep_all = TRUE) %>%   select(-id)
+
+  Type <- tibble(name = colnames(data[-1]))                             #get all edge types
+
+  merge(sites, Type) %>%
+    left_join(data_long, by = c("x" = "Var1", "name" = "name"))%>%
+    left_join(data_long, by = c("y" = "Var1", "name" = "name")) %>%    #merge the data
+    mutate(weight = value.x * value.y) %>%                            #multiply the pairs
+    select(-c(value.x, value.y)) %>%
+    drop_na() %>%
+    filter(weight > 0) %>%
+    tibble::add_column(type = edge_type, subtype = edge_subtype)
+}
+```
+
+
+
+
+
+
+
