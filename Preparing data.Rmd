@@ -70,7 +70,15 @@ It is sometimes easier to append and edit the network data when it is stored in 
 
 
 ```{r co-presence edgelist}
+  data_long <- data %>% pivot_longer(-1, names_to = "name") %>% rename(Var1 = 1)  #make data long
 
+  sites <- data %>%                                                    #get all pairs of sites
+    expand(x = .[[1]], y = .[[1]]) %>%
+    filter(x != y)%>%   rowwise() %>%
+    mutate(id = paste0(sort(c(x, y)), collapse = " ")) %>%
+    distinct(id, .keep_all = TRUE) %>%   select(-id)
+    
+    
 ```
 
 ```{r make edge and node list}
