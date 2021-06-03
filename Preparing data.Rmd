@@ -15,10 +15,10 @@ We will usually start our work with what is called a "rectangular" matrix of arc
 # Here we get a dataset from the archdata repository. If you do not have this on your R installation yet, run:
 # install.packages("archdata")
 library(archdata) 
-data("EIAGraves")
-
+data(Michelsberg)
+??archdata
 #Visually check the data:
-View(EIAGraves)
+View(Michelsberg)
 ```
 
 EIAGraves is a dataset of 52 different ceramic types in 6 large tombs and 10 broadly contemporaneous groups of tombs. To find out more, run this command
@@ -30,12 +30,10 @@ help("EIAGraves")
 
 The first step for this data will be to tell R that the column "Type" contains the names of the rows. Then we will transpose the table, making the columns into the rows and vice-versa.
 ```{r column to row names}
-EIAGraves <- EIAGraves %>% 
-  column_to_rownames(var = "Type") %>%  # turn "type column into rownames
-  t()  # transpose
-
-#Visually check the data:
-View(EIAGraves)
+Michelsberg.pot <- Michelsberg %>% 
+  #for the start we only want one phase
+  filter(mbk_phase == "III") %>% 
+  select(5:39)
 ```
 
 What we want now is a so-called square matrix, where the rows and columns are the same...
@@ -57,8 +55,8 @@ co.p <- function(x, thresh = 0.1) {
 }
 
 # run the function
-gravesP <- co.p(EIAGraves)
-
+gravesP <- co.p(Michelsberg.pot, 0.2)
+gravesP[lower.tri(gravesP)] <- 0
 #Visually check the new table:
 View(gravesP)
 ```
@@ -71,7 +69,7 @@ To create these lists only a edgelist is required. There are multiple ways to cr
 
 #an edgelist consists of all pairs of possible connections between graves 
 #first we pick the elements that are linked (graves)
-  edge.cop <- rownames(EIAGraves) %>%
+  edge.cop <- rownames(Michelsberg.pot) %>%
   #combn gives out each possible pairing
     combn(m= 2) %>% 
   #as the data is wide we need to transpose it  
@@ -80,11 +78,11 @@ To create these lists only a edgelist is required. There are multiple ways to cr
     as.data.frame()
   
 #to keep it simple we take the connection of each pair we already calculated with our copresence matrix
-  gravesP <- co.p(EIAGraves, thresh = 0.1) 
+  edgeP <- co.p(Michelsberg.pot, thresh = 0.2) 
   #we delete all redundant and selfrefering parts of the matrix
-    gravesP[upper.tri(gravesP, diag = TRUE)] <- NA
+   edgeP[upper.tri(edgeP, diag = TRUE)] <- NA
   #  than we add it as to the dataframe with our grave pairs
-    edge.cop$weight <- as.vector(gravesP) %>% 
+    edge.cop$weight <- as.vector(edgeP) %>% 
       na.omit()
   
     #finally we delete all the pairs that share nothing 
