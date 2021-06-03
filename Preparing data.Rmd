@@ -34,6 +34,7 @@ The first step for this data will be to tell R that the column "Type" contains t
 Michelsberg.pot <- Michelsberg %>% 
   #for the start we only want one phase
   filter(mbk_phase == "III") %>% 
+  #we select all columns that contain information on the amount of the different pottery types
   select(5:39)
 ```
 
@@ -159,8 +160,69 @@ scale_edge_color_continuous(low = "lightblue", high = "red") +
   geom_node_text(aes(label = name))
 ```
 
-#working with the node list
-```{r nodelist}
+#working with the node list/visualisation3: maybe you want to compare the network to the landscape to check if geographic position plays a role for the connections. as we have coordinates in our data, but not yet in our network data. we need to add it first. The data can be added to the node list (if it is sitedata) or to the edgelist(if it would be data regarding the connection)
+```{r nodelist and coords}
+#we extract the coordinates for the sites of our period from the data
+ coords <- Michelsberg %>% 
+  #for the start we only want one phase
+  filter(mbk_phase == "III") %>%
+  select(x_utm32n, y_utm32n)
+  
+  
+netpotteryP <- netpotteryP %>% 
+  activate(nodes) %>% 
+  mutate("lon" = coords$x_utm32n, "lat" = coords$y_utm32n)
+  
+netpotteryP
+ggraph(netpotteryP, x = lon, y = lat) +
+#with every layer we add some new part of our network to the plot; first the edges;now the color of the edges is based on there weight. this way we can see which pottery share more than just a single object
+    geom_edge_link(aes(color = weight), alpha = 0.5) +
+scale_edge_color_continuous(low = "lightblue", high = "red") +
+  geom_node_point()
+#labels are removed to make it less fuzzy
+```
 
+```{r degree centrality}
+library(igraph)
+netpotteryP %>% 
+  activate(nodes) %>% 
+  mutate(deg = centrality_degree()) %>% 
+  get.data.frame(what = c("vertices")) %>% 
+  select(deg) %>% 
+  arrange(-deg)
+
+centrality_de
+  
+ggraph(netpotteryP, x = lon, y = lat) +
+#with every layer we add some new part of our network to the plot; first the edges;now the color of the edges is based on there weight. this way we can see which pottery share more than just a single object
+    geom_edge_link(aes(color = weight), alpha = 0.5) +
+scale_edge_color_continuous(low = "lightblue", high = "red") +
+  geom_node_point(aes(size = centrality_degree(weights = weight)))
+#labels are removed to make it less fuzzy
+
+```
+```{r higher thresh}
+co.p(Michelsberg.pot, 0.25) %>% 
+  as_tbl_graph() %>% 
+  activate(nodes) %>% 
+  mutate("lon" = coords$x_utm32n, "lat" = coords$y_utm32n) %>% 
+ # filter(!node_is_isolated()) %>% 
+  ggraph(x = lon, y = lat) +
+#with every layer we add some new part of our network to the plot; first the edges;now the color of the edges is based on there weight. this way we can see which pottery share more than just a single object
+    geom_edge_link(aes(color = weight), alpha = 0.5) +
+scale_edge_color_continuous(low = "lightblue", high = "red") +
+  geom_node_point()
+
+
+co.p(Michelsberg.pot, 0.25) %>% 
+  as_tbl_graph() %>% 
+  activate(nodes) %>% 
+  filter(!node_is_isolated()) %>% 
+  ggraph(layout = "stress") +
+#with every layer we add some new part of our network to the plot; first the edges;now the color of the edges is based on there weight. this way we can see which pottery share more than just a single object
+    geom_edge_link(aes(color = weight), alpha = 0.5) +
+scale_edge_color_continuous(low = "lightblue", high = "red") +
+  geom_node_point()+
+  geom_node_text(aes(label = name))
 ```
 
