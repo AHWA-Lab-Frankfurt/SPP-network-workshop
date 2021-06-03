@@ -12,9 +12,10 @@ library(tidyverse)
 We will usually start our work with what is called a "rectangular" matrix of archaeological sites and finds. Rectangular in this case means that the row and column names are not identical. There are two ways of getting this data ready for network analysis. The first is a square matrix or adjacency matrix, the second is an edge list. We will here show the stepts to get both of these products in R.
 
 ```{r get data}
+
 burkinasites.decor <- burkinasites %>% 
   column_to_rownames(var = "site_code") %>% 
-  select(contains("decor")) 
+  select(contains("decor")) %>% 
   replace(is.na(.),0) %>% 
   filter_all(any_vars(.), !0) 
 
@@ -165,7 +166,62 @@ ggraph(layout = "stress") +
 ```
 
 
-```{r degree centrality}
+```{r BR burkina}
+sim.mat <- function(x) {
+    # get names of sites
+    names <- row.names(x)
+    x <- na.omit(x)  # remove any rows with missing data
+    x <- prop.table(as.matrix(x), 1)  # convert to row proportions
+    rd <- dim(x)[1]
+    # create an empty symmetric matrix of 0s
+    results <- matrix(0, rd, rd)
+    # the following dreaded double for loop goes through every cell in the
+    # output data table and calculates the BR value as descried above
+    for (s1 in 1:rd) {
+        for (s2 in 1:rd) {
+            x1Temp <- as.numeric(x[s1, ])
+            x2Temp <- as.numeric(x[s2, ])
+            results[s1, s2] <- 2 - (sum(abs(x1Temp - x2Temp)))
+        }
+    }
+    row.names(results) <- names  # assign row names to output
+    colnames(results) <- names  # assign column names to output
+    results <- results/2  # rescale results between 0 and 1
+    results <- round(results, 3)  # round results
+    return(results)
+}  # return the final output table
+
+# Run the function defined above on our sample data
+burkinaBR <- sim.mat(burkinasites.decor)
+burkinaBR[lower.tri(burkinaBR, diag = TRUE)] <- 0
+View(burkinaBR)
+
+Brnet <- as_tbl_graph(burkinaBR)
+Brnet
+
+Brnet %>% activate(edges) %>% as.data.frame() %>% 
+  ggplot(aes(x = weight))+
+  geom_density()
+  
+#this suggests we need to get the weights between about 0.55 and 0.90 in order to only get the peak.
+Brnet %>% 
+  activate(edges) %>% 
+  filter(weight>0.55) %>% 
+  filter(weight<0.90) %>% 
+  ggraph(layout = "stress")+
+  geom_edge_link(aes(color = weight), alpha = 0.5) +
+  geom_node_point()+
+  geom_node_text(aes(label = name))
+#still no good
+Brnet %>% 
+  activate(edges) %>% 
+  filter(weight>0.9) %>% 
+  activate(nodes) %>% 
+  filter(!node_is_isolated()) %>% 
+  ggraph(layout = "stress")+
+  geom_edge_link(aes(color = weight), alpha = 0.5) +
+  geom_node_point()+
+  geom_node_text(aes(label = name))
 
 ```
 
