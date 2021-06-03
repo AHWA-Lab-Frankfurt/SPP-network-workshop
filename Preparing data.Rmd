@@ -24,7 +24,7 @@ library(archdata)
 data(Michelsberg)
 
 #Visually check the data:
-View(Michelsberg)
+head(Michelsberg)
 ```
 
 To get detailed information about the dataset, run this command:
@@ -35,13 +35,13 @@ help(Michelsberg)
 # Adjacency Matrices
 
 The Michelsberg data contains observations from all of Lüning's MBK phases. We will pick one phase here to create a network from. This has the consequence that intergenerational contact (at least of the long-term traditional type) is not part of this analysis.
-```{r column to row names}
+```{r subset relevant rows and columns}
 mbk3 <- Michelsberg %>% 
   filter(mbk_phase == "III") %>%  # select only Phase III
   select(5:39)  # select all columns that contain information on the amount of the different pottery types
 
 #now look at the data to make sure it has worked
-View(mbk3)
+head(mbk3)
 ```
 This is now the data we need. Note that the dataset is still in the form of a rectangular matrix. That is, the sites are the rows and the pot types the columns. What we want now is a so-called **square matrix** or **adjacency matrix**. This will have those entities that we want as nodes in our network as both rows and columns, and the data between them will specify their connection.
 
@@ -73,15 +73,10 @@ The above code chunk contains a function that calculates the co-presence in a re
 ```{r make co-presence matrix}
 # run the function
 mbk3mat <- co.p(mbk3, 0.2)
-# look at the data
-View(mbk3mat)
 
 # What we have now is a matrix that has both the upper and the lower triangles. All pairs of sites occur twice. Also present is the diagonal, which now tells us how many types a site shares with itself. This is unneccessary and confuses the network analysis package that we will use later. So we get rid of the duplicates and the diagonal.
 
-mbk3mat[lower.tri(mbk3mat), diag = TRUE] <- 0  # we assign the value 0 to the the lower triangle including the diagonal.  
-
-#Visually check the new table:
-View(mbk3mat)
+mbk3mat[lower.tri(mbk3mat, diag = TRUE)] <- 0  # we assign the value 0 to the the lower triangle including the diagonal. 
 ```
 
 This data is now ready to be read into a network analysis package. You could also export it from R and feed it into an external network analysis tool, such as UCInet or Pajek.
