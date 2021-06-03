@@ -12,13 +12,17 @@ library(tidyverse)
 We will usually start our work with what is called a "rectangular" matrix of archaeological sites and finds. Rectangular in this case means that the row and column names are not identical. There are two ways of getting this data ready for network analysis. The first is a square matrix or adjacency matrix, the second is an edge list. We will here show the stepts to get both of these products in R.
 
 ```{r get data}
-# Here we get a dataset from the archdata repository. If you do not have this on your R installation yet, run:
-# install.packages("archdata")
-library(archdata) 
-data("EIAGraves")
+burkinasites.decor <- burkinasites %>% 
+  column_to_rownames(var = "site_code") %>% 
+  select(contains("decor")) 
+  replace(is.na(.),0) %>% 
+  filter_all(any_vars(.), !0) 
 
-#Visually check the data:
-View(EIAGraves)
+burkinasites.decor
+
+#removing plain and polished 
+burkinasites.decor <- burkinasites.decor %>% 
+  select(-decor_plain, -decor_poliert)
 ```
 
 EIAGraves is a dataset of 52 different ceramic types in 6 large tombs and 10 broadly contemporaneous groups of tombs. To find out more, run this command
@@ -30,12 +34,7 @@ help("EIAGraves")
 
 The first step for this data will be to tell R that the column "Type" contains the names of the rows. Then we will transpose the table, making the columns into the rows and vice-versa.
 ```{r column to row names}
-EIAGraves <- EIAGraves %>% 
-  column_to_rownames(var = "Type") %>%  # turn "type column into rownames
-  t()  # transpose
 
-#Visually check the data:
-View(EIAGraves)
 ```
 
 What we want now is a so-called square matrix, where the rows and columns are the same...
@@ -57,8 +56,8 @@ co.p <- function(x, thresh = 0.1) {
 }
 
 # run the function
-gravesP <- co.p(EIAGraves)
-
+gravesP <- co.p(burkinasites.decor, 0.6)
+gravesP[lower.tri(gravesP, diag = TRUE)] <- 0
 #Visually check the new table:
 View(gravesP)
 ```
@@ -71,7 +70,7 @@ To create these lists only a edgelist is required. There are multiple ways to cr
 
 #an edgelist consists of all pairs of possible connections between graves 
 #first we pick the elements that are linked (graves)
-  edge.cop <- rownames(EIAGraves) %>%
+  edge.cop <- rownames(burkinasites.decor) %>%
   #combn gives out each possible pairing
     combn(m= 2) %>% 
   #as the data is wide we need to transpose it  
@@ -80,11 +79,11 @@ To create these lists only a edgelist is required. There are multiple ways to cr
     as.data.frame()
   
 #to keep it simple we take the connection of each pair we already calculated with our copresence matrix
-  gravesP <- co.p(EIAGraves, thresh = 0.1) 
+  edgeP <- co.p(burkinasites.decor, thresh = 0.6) 
   #we delete all redundant and selfrefering parts of the matrix
-    gravesP[upper.tri(gravesP, diag = TRUE)] <- NA
+    edgeP[upper.tri(edgeP, diag = TRUE)] <- NA
   #  than we add it as to the dataframe with our grave pairs
-    edge.cop$weight <- as.vector(gravesP) %>% 
+    edge.cop$weight <- as.vector(edgeP) %>% 
       na.omit()
   
     #finally we delete all the pairs that share nothing 
@@ -140,15 +139,27 @@ ggraph(gravesP, layout = "stress") +
   geom_node_point()+
   geom_node_text(aes(label = name), color = "red")
   
-  #what is the small difference?
+  #what is the difference?
 ```
 
 #networkvisualization2:
 now that we know that the networks are (nearly) the same we will continue working only with netgravesP. we can extend the plot layers with aes() to make more sophisted plots that allow us to see more 
 ```{r}
- ggraph(gravesP, layout = "stress") +
+netgravesP  %>% 
+  activate(nodes) %>% 
+  filter(!node_is_isolated()) %>% 
+ggraph(layout = "stress") +
 #with every layer we add some new part of our network to the plot; first the edges;now the width of the edges is based on there weight. this way we can see which graves share more than just a single object
     geom_edge_link(aes(edge_width = weight), alpha = 0.5) +
+  geom_node_point()+
+  geom_node_text(aes(label = name))
+
+netgravesP  %>% 
+  activate(nodes) %>% 
+  filter(!node_is_isolated()) %>% 
+ggraph(layout = "stress") +
+#with every layer we add some new part of our network to the plot; first the edges;now the width of the edges is based on there weight. this way we can see which graves share more than just a single object
+    geom_edge_link(aes(color = weight), alpha = 0.5) +
   geom_node_point()+
   geom_node_text(aes(label = name))
 ```
