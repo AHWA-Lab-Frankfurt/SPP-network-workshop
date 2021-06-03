@@ -21,9 +21,10 @@ data(Michelsberg)
 View(Michelsberg)
 ```
 
-EIAGraves is a dataset of 52 different ceramic types in 6 large tombs and 10 broadly contemporaneous groups of tombs. To find out more, run this command
+Michelsberg is a dataset of 52 different ceramic types in 6 large tombs and 10 broadly contemporaneous groups of tombs. To find out more, run this command
 ```{r find out about dataset}
-help("EIAGraves")
+help(Michelsberg)
+
 ```
 
 # Adjacency Matrices
@@ -55,10 +56,10 @@ co.p <- function(x, thresh = 0.1) {
 }
 
 # run the function
-gravesP <- co.p(Michelsberg.pot, 0.2)
-gravesP[lower.tri(gravesP)] <- 0
+potteryP <- co.p(Michelsberg.pot, 0.2)
+potteryP[lower.tri(potteryP)] <- 0
 #Visually check the new table:
-View(gravesP)
+View(potteryP)
 ```
 
 
@@ -67,8 +68,8 @@ It is sometimes easier to append and edit the network data when it is stored in 
 To create these lists only a edgelist is required. There are multiple ways to create an edgelist based on the way connections between nodes are calculated. In this example we use the copresence-matrix calculated before. 
 ```{r co-presence edgelist}
 
-#an edgelist consists of all pairs of possible connections between graves 
-#first we pick the elements that are linked (graves)
+#an edgelist consists of all pairs of possible connections between sites 
+#first we pick the elements that are linked (sites)
   edge.cop <- rownames(Michelsberg.pot) %>%
   #combn gives out each possible pairing
     combn(m= 2) %>% 
@@ -99,20 +100,20 @@ library(tidygraph)
 
 
 #tidygraph::as_tbl_graph is a pretty powerfull function that can turn adjacency matrices and edgelists into network objects
-netgravesP <- tidygraph::as_tbl_graph(gravesP)
+netpotteryP <- tidygraph::as_tbl_graph(potteryP)
 
 #view doesnt work with network objects, but it isnt necessary to look at things anyway. an object can also just be looked at by calling its name as if it was a function
-netgravesP
-#we see that it consists of node data(the graves) and edge data (the connections based on copresence of pottery)
+netpotteryP
+#we see that it consists of node data(the pottery) and edge data (the connections based on copresence of pottery)
 
 
 ###now it is time for you to try something out yourself. transform the edgelist into a network object by using the same function as above on edge.cop
-#write the command behind the arrow to save the network under the name netgravesEP
+#write the command behind the arrow to save the network under the name netpotteryEP
 #if you dont know what to do you can look in the next chunk for the proper way
-netgravesEP <- 
+netpotteryEP <- 
   
 #lets look if it worked
-  netgravesEP
+  netpotteryEP
 ```
 
 #networkvisualization:
@@ -121,19 +122,19 @@ the network object itself doesnt give much information in the first place. But i
 library(ggraph)
  
 #the first command is the base of the plot containing data and the layout, here the data is our network graph based on the adjacency matrix
-ggraph(gravesP, layout = "stress") +
+ggraph(potteryP, layout = "stress") +
 #with every layer we add some new part of our network to the plot; first the edges 
     geom_edge_link() +
   #then the nodes plotted as points
   geom_node_point()+
- #to distinguish the graves we add a layer that contains there names. The aes(label = name) uses the names in the node list; the color="red" changes the color to make it easier to read. we will later show more ways to manipulate the layers to make more information vible
+ #to distinguish the pottery we add a layer that contains there names. The aes(label = name) uses the names in the node list; the color="red" changes the color to make it easier to read. we will later show more ways to manipulate the layers to make more information vible
    geom_node_text(aes(label = name), color = "red")
   
  ##this is how an edgelist is transformed to a network with as_tbl_graph()
- netgravesEP <- tidygraph::as_tbl_graph(edge.cop) 
+ netpotteryEP <- tidygraph::as_tbl_graph(edge.cop) 
 
  #this time we use the network based on the edgelist.
-  ggraph(netgravesEP, layout = "graphopt") +
+  ggraph(netpotteryEP, layout = "graphopt") +
   geom_edge_link() +
   geom_node_point()+
   geom_node_text(aes(label = name), color = "red")
@@ -142,17 +143,24 @@ ggraph(gravesP, layout = "stress") +
 ```
 
 #networkvisualization2:
-now that we know that the networks are (nearly) the same we will continue working only with netgravesP. we can extend the plot layers with aes() to make more sophisted plots that allow us to see more 
+now that we know that the networks are (nearly) the same we will continue working only with netpotteryP. we can extend the plot layers with aes() to make more sophisted plots that allow us to see more 
 ```{r}
- ggraph(gravesP, layout = "stress") +
-#with every layer we add some new part of our network to the plot; first the edges;now the width of the edges is based on there weight. this way we can see which graves share more than just a single object
+ ggraph(potteryP, layout = "stress") +
+#with every layer we add some new part of our network to the plot; first the edges;now the width of the edges is based on there weight. this way we can see which pottery share more than just a single object
     geom_edge_link(aes(edge_width = weight), alpha = 0.5) +
+  geom_node_point()+
+  geom_node_text(aes(label = name))
+
+ggraph(potteryP, layout = "stress") +
+#with every layer we add some new part of our network to the plot; first the edges;now the color of the edges is based on there weight. this way we can see which pottery share more than just a single object
+    geom_edge_link(aes(color = weight), alpha = 0.5) +
+scale_edge_color_continuous(low = "lightblue", high = "red") +
   geom_node_point()+
   geom_node_text(aes(label = name))
 ```
 
-
-```{r degree centrality}
+#working with the node list
+```{r nodelist}
 
 ```
 
