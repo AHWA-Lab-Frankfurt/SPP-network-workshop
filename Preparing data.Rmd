@@ -51,8 +51,6 @@ There are essentially two different ways of doing this. The first is to work out
 Co-presence assumes that a connection is there because a type is shared. The more types are shared, the stronger the connection is. Similarity is a more overall measure, less dependent on individual types, and takes into account also the proportions of types. There is a connection because people had similar proportions of similar pots.
 
 You can find useful R functions for both types in this script by Matt Peeples (2017):http://mattpeeples.net/netstats.html. For our example, we will choose co-presence as a basis for the network, as it allows for clearer conclusions. 
-
-
 ```{r co-presence function (after Peeples 2017, http://mattpeeples.net/netstats.html)}
 # If you are unfamiliar with R functions, this is a piece of code designed to avoid having to type too much. It is a tiny piece of software that we store to run it on our data.
 co.p <- function(x, thresh = 0.1) {
@@ -152,6 +150,4 @@ mbk3nodes <- Michelsberg %>%
   select(site_feature, site_name, feature_nr, x_utm32n, y_utm32n) %>%   # select the columns we want
   rename(lon = x_utm32n, lat = y_utm32n, id = site_feature) #change some of the more unwieldy names
 ```
-
-
-
+You now have an edge list and a node list with names and coordinates of the sites. You are ready to go and do some network analysis.
