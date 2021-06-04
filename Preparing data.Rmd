@@ -24,7 +24,7 @@ library(archdata)
 data(Michelsberg)
 
 #Visually check the data:
-View(Michelsberg)
+head(Michelsberg)
 ```
 
 To get detailed information about the dataset, run this command:
@@ -35,13 +35,14 @@ help(Michelsberg)
 # Adjacency Matrices
 
 The Michelsberg data contains observations from all of Lüning's MBK phases. We will pick one phase here to create a network from. This has the consequence that intergenerational contact (at least of the long-term traditional type) is not part of this analysis.
-```{r column to row names}
+
+```{r subset relevant rows and columns}
 mbk3 <- Michelsberg %>% 
   filter(mbk_phase == "III") %>%  # select only Phase III
   select(5:39)  # select all columns that contain information on the amount of the different pottery types
 
 #now look at the data to make sure it has worked
-View(mbk3)
+head(mbk3)
 ```
 This is now the data we need. Note that the dataset is still in the form of a rectangular matrix. That is, the sites are the rows and the pot types the columns. What we want now is a so-called **square matrix** or **adjacency matrix**. This will have those entities that we want as nodes in our network as both rows and columns, and the data between them will specify their connection.
 
@@ -51,7 +52,6 @@ There are essentially two different ways of doing this. The first is to work out
 Co-presence assumes that a connection is there because a type is shared. The more types are shared, the stronger the connection is. Similarity is a more overall measure, less dependent on individual types, and takes into account also the proportions of types. There is a connection because people had similar proportions of similar pots.
 
 You can find useful R functions for both types in this script by Matt Peeples (2017):http://mattpeeples.net/netstats.html. For our example, we will choose co-presence as a basis for the network, as it allows for clearer conclusions. 
-
 
 ```{r co-presence function (after Peeples 2017, http://mattpeeples.net/netstats.html)}
 # If you are unfamiliar with R functions, this is a piece of code designed to avoid having to type too much. It is a tiny piece of software that we store to run it on our data.
@@ -73,15 +73,10 @@ The above code chunk contains a function that calculates the co-presence in a re
 ```{r make co-presence matrix}
 # run the function
 mbk3mat <- co.p(mbk3, 0.2)
-# look at the data
-View(mbk3mat)
 
 # What we have now is a matrix that has both the upper and the lower triangles. All pairs of sites occur twice. Also present is the diagonal, which now tells us how many types a site shares with itself. This is unneccessary and confuses the network analysis package that we will use later. So we get rid of the duplicates and the diagonal.
 
-mbk3mat[lower.tri(mbk3mat), diag = TRUE] <- 0  # we assign the value 0 to the the lower triangle including the diagonal.  
-
-#Visually check the new table:
-View(mbk3mat)
+mbk3mat[lower.tri(mbk3mat, diag = TRUE)] <- 0  # we assign the value 0 to the the lower triangle including the diagonal. 
 ```
 
 This data is now ready to be read into a network analysis package. You could also export it from R and feed it into an external network analysis tool, such as UCInet or Pajek.
@@ -91,7 +86,7 @@ Apart from adjacency matrices, the second format that network data comes in is t
 
 This is a minimal example:
 from | to
----------
+-----|---
 A    | B
 A    | C
 
@@ -102,19 +97,23 @@ The node list is simply a list of nodes and their attributes. Unlike the matrix,
 Let us turn the Michelsberg data into an edge and node list. The process is more complicated, but you will see that there is a lot more information there.
 
 **Note: We are still using co-presence to determine our ties and their weights**
+
+Here is a function that will make an edgelist from our data
 ```{r co-presence edgelist function}
 # Make a dataset with  row names (sites) as a separate column
-mbk3a <- mbk3 %>% 
+make.edgelist <- function(data){
+
+data2 <- data %>% 
   rownames_to_column(var = "site") %>%   # turn the rownames into a column for further processing
   select(site, everything())  #place the site variable at the beginning
 
 # Bring the data into long form, ready for co-presence  
-mbk3long <- mbk3a %>% 
+datalong <- data2 %>% 
   pivot_longer(!site, names_to = "type") %>%  # turn the data into a long list
   mutate(value = if_else(value>0.1, 1, 0))  # everything with a value is classed as present (1), otherwise as absent (0)
 
 # Get all the pairs of sites  
-sites <- mbk3a %>%                                                    
+sites <- data2 %>%                                                    
     expand(x = .[[1]], y = .[[1]]) %>%  # gets all possible pairs of sites
     filter(x != y)%>%  # removes those in which x = y  
     rowwise()%>%  # ready to select each row
@@ -123,174 +122,33 @@ sites <- mbk3a %>%
     select(-id)  # remove helper column
  
 # get all pottery types
-types <- tibble(type = colnames(mbk3a[-1])) 
+types <- tibble(type = colnames(data2[-1])) 
 
 # create the finished datasets
-test <- merge(sites, types) %>%
-    left_join(mbk3long, by = c("x" = "site", "type" = "type"))%>%
-    left_join(mbk3long, by = c("y" = "site", "type" = "type")) %>%    #merge the data
+merge(sites, types) %>%
+    left_join(datalong, by = c("x" = "site", "type" = "type"))%>%
+    left_join(datalong, by = c("y" = "site", "type" = "type")) %>%    #merge the data
     mutate(xy = value.x + value.y) %>%                            # add the pairs
     mutate(weight = if_else(xy == 2, 1, 0)) %>%   # if there is a copresence (sum = 2), then a connection is made (1)
     select(-c(value.x, value.y, xy)) %>%  # remove the superfluous columns
-    filter(weight > 0)  # remove the rows without connections 
-  
-# next sum across all the types
-
-
-#an edgelist consists of all pairs of possible connections between sites 
-#first we pick the elements that are linked (sites)
-  mbk3.edges <- rownames(mbk3) %>%
-  #combn gives out each possible pairing
-    combn(m= 2) %>% 
-  #as the data is wide we need to transpose it  
-   t() %>% 
-  #dataframe is the class that is normally used to create edgelists
-    as.data.frame()
-  
-#to keep it simple we take the connection of each pair we already calculated with our copresence matrix
-  edgeP <- co.p(Michelsberg.pot, thresh = 0.2) 
-  #we delete all redundant and selfrefering parts of the matrix
-   edgeP[upper.tri(edgeP, diag = TRUE)] <- NA
-  #  than we add it as to the dataframe with our grave pairs
-    edge.cop$weight <- as.vector(edgeP) %>% 
-      na.omit()
-  
-    #finally we delete all the pairs that share nothing 
-  edge.cop <- edge.cop %>% 
-   filter(weight > 0)
-  
+    filter(weight > 0) %>%   # remove the rows without connections 
+    group_by(from = pmin(x,y), to = pmax(x,y)) %>% # group data by site pairs 
+    summarise(weight = sum(weight)) %>% # sum weights across all types
+    as_tibble()
+  }
 ```
+We'll apply it to our MBK data now:
+```{r make an edgelist}
+mbk3edges <- make.edgelist(mbk3)
 
-
-#network:
-The adjacency matrix or the edgelist can now be used to create an network object. There are different packages that work with networks but a combination of "tidygraph"(clean& easy network data), "igraph" (network statistics) and "ggraph" (network visualisation) is the most convinient way. 
-```{r creating network objects}
-library(tidygraph)
-
-
-#tidygraph::as_tbl_graph is a pretty powerfull function that can turn adjacency matrices and edgelists into network objects
-netpotteryP <- tidygraph::as_tbl_graph(potteryP)
-
-#view doesnt work with network objects, but it isnt necessary to look at things anyway. an object can also just be looked at by calling its name as if it was a function
-netpotteryP
-#we see that it consists of node data(the pottery) and edge data (the connections based on copresence of pottery)
-
-
-###now it is time for you to try something out yourself. transform the edgelist into a network object by using the same function as above on edge.cop
-#write the command behind the arrow to save the network under the name netpotteryEP
-#if you dont know what to do you can look in the next chunk for the proper way
-netpotteryEP <- 
-  
-#lets look if it worked
-  netpotteryEP
+#Have a look at your edgelist
+View(mbk3edges)
 ```
-
-#networkvisualization:
-the network object itself doesnt give much information in the first place. But it is the basis to visualize the network. The visualisation can be used to get an overview on the structure of our network. 
-```{r}
-library(ggraph)
- 
-#the first command is the base of the plot containing data and the layout, here the data is our network graph based on the adjacency matrix
-ggraph(potteryP, layout = "stress") +
-#with every layer we add some new part of our network to the plot; first the edges 
-    geom_edge_link() +
-  #then the nodes plotted as points
-  geom_node_point()+
- #to distinguish the pottery we add a layer that contains there names. The aes(label = name) uses the names in the node list; the color="red" changes the color to make it easier to read. we will later show more ways to manipulate the layers to make more information vible
-   geom_node_text(aes(label = name), color = "red")
-  
- ##this is how an edgelist is transformed to a network with as_tbl_graph()
- netpotteryEP <- tidygraph::as_tbl_graph(edge.cop) 
-
- #this time we use the network based on the edgelist.
-  ggraph(netpotteryEP, layout = "graphopt") +
-  geom_edge_link() +
-  geom_node_point()+
-  geom_node_text(aes(label = name), color = "red")
-  
-  #what is the small difference?
+This is ready to be given to a network analysis package, but for now it contains the same data as our co-presence matrix. Time to add some more. This will go in the nodelist, which can easily be extracted from the original dataset.
+```{r make a nodelist and add data}
+#first, make a nodelist by taking all the sites represented
+mbk3nodes <- Michelsberg %>% 
+  rownames_to_column(var = "site_feature") %>%  # make the rownames into a separate column
+  select(site_feature, site_name, feature_nr, x_utm32n, y_utm32n) %>%   # select the columns we want
+  rename(lon = x_utm32n, lat = y_utm32n, id = site_feature) #change some of the more unwieldy names
 ```
-
-#networkvisualization2:
-now that we know that the networks are (nearly) the same we will continue working only with netpotteryP. we can extend the plot layers with aes() to make more sophisted plots that allow us to see more 
-```{r}
- ggraph(potteryP, layout = "stress") +
-#with every layer we add some new part of our network to the plot; first the edges;now the width of the edges is based on there weight. this way we can see which pottery share more than just a single object
-    geom_edge_link(aes(edge_width = weight), alpha = 0.5) +
-  geom_node_point()+
-  geom_node_text(aes(label = name))
-
-ggraph(potteryP, layout = "stress") +
-#with every layer we add some new part of our network to the plot; first the edges;now the color of the edges is based on there weight. this way we can see which pottery share more than just a single object
-    geom_edge_link(aes(color = weight), alpha = 0.5) +
-scale_edge_color_continuous(low = "lightblue", high = "red") +
-  geom_node_point()+
-  geom_node_text(aes(label = name))
-```
-
-#working with the node list/visualisation3: maybe you want to compare the network to the landscape to check if geographic position plays a role for the connections. as we have coordinates in our data, but not yet in our network data. we need to add it first. The data can be added to the node list (if it is sitedata) or to the edgelist(if it would be data regarding the connection)
-```{r nodelist and coords}
-#we extract the coordinates for the sites of our period from the data
- coords <- Michelsberg %>% 
-  #for the start we only want one phase
-  filter(mbk_phase == "III") %>%
-  select(x_utm32n, y_utm32n)
-  
-  
-netpotteryP <- netpotteryP %>% 
-  activate(nodes) %>% 
-  mutate("lon" = coords$x_utm32n, "lat" = coords$y_utm32n)
-  
-netpotteryP
-ggraph(netpotteryP, x = lon, y = lat) +
-#with every layer we add some new part of our network to the plot; first the edges;now the color of the edges is based on there weight. this way we can see which pottery share more than just a single object
-    geom_edge_link(aes(color = weight), alpha = 0.5) +
-scale_edge_color_continuous(low = "lightblue", high = "red") +
-  geom_node_point()
-#labels are removed to make it less fuzzy
-```
-
-```{r degree centrality}
-library(igraph)
-netpotteryP %>% 
-  activate(nodes) %>% 
-  mutate(deg = centrality_degree()) %>% 
-  get.data.frame(what = c("vertices")) %>% 
-  select(deg) %>% 
-  arrange(-deg)
-
-centrality_de
-  
-ggraph(netpotteryP, x = lon, y = lat) +
-#with every layer we add some new part of our network to the plot; first the edges;now the color of the edges is based on there weight. this way we can see which pottery share more than just a single object
-    geom_edge_link(aes(color = weight), alpha = 0.5) +
-scale_edge_color_continuous(low = "lightblue", high = "red") +
-  geom_node_point(aes(size = centrality_degree(weights = weight)))
-#labels are removed to make it less fuzzy
-
-```
-```{r higher thresh}
-co.p(Michelsberg.pot, 0.25) %>% 
-  as_tbl_graph() %>% 
-  activate(nodes) %>% 
-  mutate("lon" = coords$x_utm32n, "lat" = coords$y_utm32n) %>% 
- # filter(!node_is_isolated()) %>% 
-  ggraph(x = lon, y = lat) +
-#with every layer we add some new part of our network to the plot; first the edges;now the color of the edges is based on there weight. this way we can see which pottery share more than just a single object
-    geom_edge_link(aes(color = weight), alpha = 0.5) +
-scale_edge_color_continuous(low = "lightblue", high = "red") +
-  geom_node_point()
-
-
-co.p(Michelsberg.pot, 0.25) %>% 
-  as_tbl_graph() %>% 
-  activate(nodes) %>% 
-  filter(!node_is_isolated()) %>% 
-  ggraph(layout = "stress") +
-#with every layer we add some new part of our network to the plot; first the edges;now the color of the edges is based on there weight. this way we can see which pottery share more than just a single object
-    geom_edge_link(aes(color = weight), alpha = 0.5) +
-scale_edge_color_continuous(low = "lightblue", high = "red") +
-  geom_node_point()+
-  geom_node_text(aes(label = name))
-```
-
