@@ -1,0 +1,45 @@
+---
+title: "Comparing networks"
+author: "Nikolas Gestrich, Juan-Marco Puerta-Schardt"
+date: "6/8/2021"
+output: html_document
+---
+
+This document will show some basic ways in which networks can be compared. For archaeologists, this might be used to compare networks made on the same set of sites but whose edges are made on different materials, or for comparing different regions, or to assess the change of a network through time. The latter is what we will demonstrate here, using the Michelsberg data from the preceding instructions.
+
+# Making the networks
+The Michelsberg dataset contains a number of different periods. 
+```{r check Michelsberg phases}
+#this command will give us a list of periods and how many entries there are of each
+Michelsberg %>% count(mbk_phase)
+```
+We can see that there are a lot of in between phases or uncertain attributions, and that there is quite a difference in the number of entries. In this case, we will artificially collapse these groups to make the numbers even, though we would need to justify this based on external arguments if this was real research work. As it is, we will place I together, with I/II, remove II/III, group III/IV with IV, and remove IV/V.
+```{r adjust periods}
+mbkphases <- Michelsberg %>%        #make a new dataset with modifications
+                                    #adding the old phases to a new, simplified, phase column
+  mutate(phase = case_when(mbk_phase == "I/II"| mbk_phase == "I" ~ 1,
+                           mbk_phase == "II" ~ 2,
+                           mbk_phase == "III" ~ 3,
+                           mbk_phase == "III/IV"| mbk_phase == "IV" ~ 4,
+                           TRUE ~ NA_real_))
+
+# Look at the new phases
+mbkphases %>% count(phase)
+```
+We now have four phases which have a tolerable number of observations in each. We will now make a network for each of them using the commands we learnt in the "Preparing data" file.
+```{r make phase networks}
+# to save us from typing too much, we will make a little function
+select.phase <- function(p){
+  mbkphases %>% 
+    filter(phase == p) %>% # select only relevant phase
+    select(5:39)  # select all columns that contain information on the amount of the different pottery types
+}
+
+# now apply this to the phases
+mbk1 <- select.phase(1)
+mbk2 <- select.phase(2)
+mbk3 <- select.phase(3)
+mbk4 <- select.phase(4)
+```
+
+
