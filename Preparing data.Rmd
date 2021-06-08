@@ -80,7 +80,7 @@ mbk3mat[lower.tri(mbk3mat, diag = TRUE)] <- 0  # we assign the value 0 to the th
 This data is now ready to be read into a network analysis package. You could also export it from R and feed it into an external network analysis tool, such as UCInet or Pajek.
 
 # Edge and node list format
-Apart from adjacency matrices, the second format that network data comes in is the so-called **edge list**, with its corollary, the **node list**. An edge list, as the naem suggests, lists the edges of a graph.
+Apart from adjacency matrices, the second format that network data comes in is the so-called **edge list**, with its corollary, the **node list**. An edge list, as the name suggests, lists the edges of a graph.
 
 This is a minimal example:
 from | to
@@ -145,7 +145,8 @@ View(mbk3edges)
 This is ready to be given to a network analysis package, but for now it contains the same data as our co-presence matrix. Time to add some more. This will go in the nodelist, which can easily be extracted from the original dataset.
 ```{r make a nodelist and add data}
 #first, make a nodelist by taking all the sites represented
-mbk3nodes <- Michelsberg %>% 
+mbk3nodes <- Michelsberg %>%
+  filter(mbk_phase == "III") %>% #filter the data for the MBK III 
   rownames_to_column(var = "site_feature") %>%  # make the rownames into a separate column
   select(site_feature, site_name, feature_nr, x_utm32n, y_utm32n) %>%   # select the columns we want
   rename(lon = x_utm32n, lat = y_utm32n, id = site_feature) #change some of the more unwieldy names
