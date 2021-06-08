@@ -1,11 +1,11 @@
 ---
 title: "How to get a rectangular data matrix into shape for network analysis"
 subtitle: "Instructions for the SPP Entangled Africa network workshop, 11-12 June 2021 "
-author: "NG, JMPS"
-date: "2 6 2021"
+author: "N Gestrich, J-M Puerta-Schardt"
+date: "2 - June - 2021"
 output: html_document
 ---
-```{r libraries, echo=FALSE}
+```{r libraries, echo=FALSE, warning=FALSE, message=FALSE}
 # this code chunk contains all the libraries we need to use in this process. If they are not present, use install.packages("pacakge x") to get them.
 library(tidyverse)
 ```
@@ -83,10 +83,11 @@ This data is now ready to be read into a network analysis package. You could als
 Apart from adjacency matrices, the second format that network data comes in is the so-called **edge list**, with its corollary, the **node list**. An edge list, as the name suggests, lists the edges of a graph.
 
 This is a minimal example:
-from | to
----------
-A    | B
-A    | C
+
+|from | to
+|----|-----
+|A    | B
+|A    | C
 
 But an edgelist can also store further information about that edge, for instance what weight the edge has, what type the edge as (if there are several), and any other information we might want to store.
 
