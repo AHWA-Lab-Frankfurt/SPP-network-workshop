@@ -102,7 +102,7 @@ mbk4net %>% thresh.graph(4) %>% ggraph(layout = "stress")+ red.weight + labs(tit
 Having had a look at the graph, and played around with the thresholds, we think we can see that the two middle Phases are much more connected than phases 1 and 4. But to really find out what changes, we will have to rely on network measures. We will first begin with measures on the whole network, then move on to measures on the nodes and edges.
 
 # Network comparison
-We will first look at how the network develops through time in terms of how closed or clustered it is. This means that we are looking at how many triads (connected triangles) there are. We measure this either by trasitivity, or by the clustering coefficient.Secondly, we will look at how large the network is and thirdly how wide it is.
+We will first look at how the network develops through time in terms of how closed or clustered it is. This means that we are looking at how many triads (connected triangles) there are. We measure this either by transitivity, or by the clustering coefficient.Secondly, we will look at how large the network is and thirdly how wide it is.
 
 There are a great number of measures that might characterise a graph. Here, we will use the following as an example:
 * size: how many edges does the graph have?

@@ -185,6 +185,8 @@ scale_edge_color_continuous(low = "lightblue", high = "red") +
   geom_node_point()
 #labels are removed to make it less fuzzy
 ```
+
+
 #centrality:
 There are various statistical measurements for networks. Centrality scores are one of the most basic ones and give a good overview on the role of the node. There are many different ways to calculate centralities. They are all based on the connectedness of the node, the weight of the connections can be considered but does not need to be taken into account. 
 The simplest centrality score is "degree centrality". It just counts the edges a node has. It is a relatively plain measure for the role of a node as it shows if it has many connections or only few. A node with a low "degree centrality" is probably a more isolated node on the margins of the network, while node with a high "degree centrality" is well connected and in a more central position. As the connections in archeological data are often based on similar artifacts, "degree centrality" indicates how similar the assemblage of a site is to others in the network.
