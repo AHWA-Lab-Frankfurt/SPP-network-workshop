@@ -4,12 +4,15 @@ author: "Nikolas Gestrich, Juan-Marco Puerta-Schardt"
 date: "6/8/2021"
 output: html_document
 ---
-```{r libraries}
+```{r libraries, echo = FALSE, warning = FALSE, message = FALSE}
 # Here are the libraries used in this example
 library(tidyverse)
 library(tidygraph)
 library(igraph)
 library(ggraph)
+library(ggridges)
+library(gganimate)
+library(magick)
 ```
 
 This document will show some basic ways in which networks can be compared. For archaeologists, this might be used to compare networks made on the same set of sites but whose edges are made on different materials, or for comparing different regions, or to assess the change of a network through time. The latter is what we will demonstrate here, using the Michelsberg data from the preceding instructions.
@@ -17,6 +20,9 @@ This document will show some basic ways in which networks can be compared. For a
 # Making the networks
 The Michelsberg dataset contains a number of different periods. 
 ```{r check Michelsberg phases}
+#get data
+library(archdata) 
+data(Michelsberg)
 #this command will give us a list of periods and how many entries there are of each
 Michelsberg %>% count(mbk_phase)
 ```
@@ -34,13 +40,57 @@ mbkphases <- Michelsberg %>%        #make a new dataset with modifications
 mbkphases %>% count(phase)
 ```
 We now have four phases which have a tolerable number of observations in each. We will now make a network for each of them using the commands we learnt in the "Preparing data" file.
+```{r co-presence edgelist function, echo = FALSE}
+# Here is the edgelist function from the "Peparing data" lesson:
+# Make a dataset with  row names (sites) as a separate column
+make.edgelist <- function(data){
+
+data2 <- data %>% 
+  rownames_to_column(var = "site") %>%   # turn the rownames into a column for further processing
+  select(site, everything())  #place the site variable at the beginning
+
+# Bring the data into long form, ready for co-presence  
+datalong <- data2 %>% 
+  pivot_longer(!site, names_to = "type") %>%  # turn the data into a long list
+  mutate(value = if_else(value>0.1, 1, 0))  # everything with a value is classed as present (1), otherwise as absent (0)
+
+# Get all the pairs of sites  
+sites <- data2 %>%                                                    
+    expand(x = .[[1]], y = .[[1]]) %>%  # gets all possible pairs of sites
+    filter(x != y)%>%  # removes those in which x = y  
+    rowwise()%>%  # ready to select each row
+    mutate(id = paste0(sort(c(x, y)), collapse = " ")) %>% #gives an id to every pairing
+    distinct(id, .keep_all = TRUE) %>%  #removes doubles 
+    select(-id)  # remove helper column
+ 
+# get all pottery types
+types <- tibble(type = colnames(data2[-1])) 
+
+# create the finished datasets
+merge(sites, types) %>%
+    left_join(datalong, by = c("x" = "site", "type" = "type"))%>%
+    left_join(datalong, by = c("y" = "site", "type" = "type")) %>%    #merge the data
+    mutate(xy = value.x + value.y) %>%                            # add the pairs
+    mutate(weight = if_else(xy == 2, 1, 0)) %>%   # if there is a copresence (sum = 2), then a connection is made (1)
+    select(-c(value.x, value.y, xy)) %>%  # remove the superfluous columns
+    filter(weight > 0) %>%   # remove the rows without connections 
+    group_by(from = pmin(x,y), to = pmax(x,y)) %>% # group data by site pairs 
+    summarise(weight = sum(weight)) %>% # sum weights across all types
+    as_tibble()
+  }
+```
+
 ```{r make phase networks}
 # to save us from typing too much, we will make a little function
 select.phase <- function(p){
   mbkphases %>% 
     filter(phase == p) %>% # select only relevant phase
+    distinct(site_name, .keep_all=TRUE) %>% # our phase groupings have led to duplicate sites, which we remove here. Note that this just a shortcut to clean data and has no scientific reason. You would want to do this differently in real life.
     select(5:39)  # select all columns that contain information on the amount of the different pottery types
 }
+
+mbk2 <- mbkphases %>% filter(phase == 2) %>% distinct(site_name, .keep_all=TRUE)
+
 
 # now apply this to the phases
 mbk1 <- select.phase(1)
@@ -67,10 +117,13 @@ mbk3net <- tbl_graph(nodes = mbknodes, edges = mbk3edges, directed = FALSE)
 mbk4net <- tbl_graph(nodes = mbknodes, edges = mbk4edges, directed = FALSE)
 
 #At the end of this section, let's do a little housekeeping and get rid of the datasets we won't be needing anymore:
-rm(mbk1, mbk2, mbk3, mbk4, mbkphases, mbk1edges, mbk2edges, mbk3edges, mbk4edges)
+rm(mbk1, mbk2, mbk3, mbk4, mbkphases)
 ```
-We have now created four networks which represent four different stages of the Michelsberg culture. We now want to know what changes in these networks and what this might mean for the social networks that exchanged pottery types. Did they change? In what way?
+
+We have now created four networks which represent four different stages of the Michelsberg culture. We want to know what changes in these networks and what this might mean for the social networks that exchanged pottery types. Did they change? In what way?
+
 # Visual comparison
+
 It is often a good idea to have a visual exploration of the data in the first place. So just for this, we will make some quick representations of the four graphs.
 ```{r exploration graphs}
 #Because we have to run the same steps on four graphs, we will write some helper functions. This is where R comes into its own. Imagine the number of clicks you would have to do on UCInet or similar to get this!
@@ -99,12 +152,13 @@ mbk3net %>% thresh.graph(4) %>% ggraph(layout = "stress")+ red.weight + labs(tit
 mbk4net %>% thresh.graph(4) %>% ggraph(layout = "stress")+ red.weight + labs(title = "Phase 4")
 
 ```
+
 Having had a look at the graph, and played around with the thresholds, we think we can see that the two middle Phases are much more connected than phases 1 and 4. But to really find out what changes, we will have to rely on network measures. We will first begin with measures on the whole network, then move on to measures on the nodes and edges.
 
 # Network comparison
-We will first look at how the network develops through time in terms of how closed or clustered it is. This means that we are looking at how many triads (connected triangles) there are. We measure this either by trasitivity, or by the clustering coefficient.Secondly, we will look at how large the network is and thirdly how wide it is.
 
 There are a great number of measures that might characterise a graph. Here, we will use the following as an example:
+
 * size: how many edges does the graph have?
 * order: how many nodes does the graph have?
 * mean distance: What is the mean distance between any two nodes?
@@ -155,11 +209,15 @@ rm(a,b,c,d)
 #let's have a look at the table
 phase.measures
 ```
-We see that there is quite a distance in size and order between the phases, but that it is never far from one node to another. This is due to the nature of the network: when it is about co-occurrences like this one is, this is usual.
-More interesting are the remaining measures, which all correlate to show that Phase 2 is the most closely connected. The high connectivity means that the assemblages were most homogeneous, and that therefore the social contacts between the sites extended to a similar range of objects. While the number of connections increases in Phase 3, so too does the fragility of the network, which might indicate that groups form. On this basis we could say that the Michelsberg culture found its strongest cohesion and most resembled a unified social group during Lüning's phase II. In his Phase III, a fragmentation sets in which continues through Phase IV. I hope that this goes some way to show how different these results are from what we might find out by distribution maps, and also from what was done with this data previously.
+We see that there is quite a distance in size and order between the phases, but that it is never far from one node to another. This is due to the nature of the network: when it is about co-occurrences like this one is, we would not expect too much distance.
+
+More interesting are the remaining measures, which all correlate to show that Phase 2 is the most closely connected. The high connectivity means that the assemblages were most homogeneous in this phase, and that therefore the social contacts between the sites shared a similar range of objects. While the number of connections increases in Phase 3, so too does the fragility of the network, which might indicate that groups formed. On this basis we could say that the Michelsberg culture found its strongest cohesion and most resembled a unified social group during Lüning's phase II. In his Phase III, a fragmentation sets in which continues through Phase IV. 
+
+This goes some way to show how different these results are from what we might find out by distribution maps, and also from the seriation that was done with this data previously. SNA allows us to assess the social processes behind artefact distribution patterns, provided we have a strong hypothesis to link the two.
 
 # Centralities
 Within this dynamic, what were the key sites? This is a question we will ask of measures on the nodes within our networks. We have explained these previously and here we will be using:
+
 * degree centrality
 * betweenness centrality
 * eigenvector centrality
@@ -184,19 +242,78 @@ p1 <- centralities(mbk1net, 3, 1)
 p2 <- centralities(mbk2net, 3, 2)
 p3 <- centralities(mbk3net, 3, 3)
 p4 <- centralities(mbk4net, 3, 4)
+
+#make a dataset containing all phases
+centrality <- bind_rows(p1,p2,p3,p4) 
+
+#housekeeping
+rm(p1,p2,p3,p4)
 ```
 These datasets are now the basis for us to have a look at centrality in a couple of ways: by measure, and by site. If we look at them by measure, we can find out what the highest-scoring nodes in each network are.
-```{r centralities by measure}
-test <- p1 %>% select(id, degree)
-
-
-
-centr.ph <- list(p1, p2, p3, p4)
-
-
-
-# First, we will take degree centrality and find the highest-scoring
-d <- lapply(centr.ph, function(x){ x %>% dplyr::select(id,degree)})
-t <- purrr::map(centr.ph, function(x){x %>% select(site_name,degree)}) %>% purrr::reduce(left_join, by = "site_name")
+```{r centralities by measure and site}
+#we will look at the development of degree centrality
+degree <- centrality %>% 
+  select(phase, site_name, degree) %>%  #take only relevant columns
+  pivot_wider(names_from = phase, values_from = degree) %>%  # make the long data wide
+  tibble()
 ```
+
+```{r degree table}
+#we will look at this as a table
+library(knitr)
+options(knitr.kable.NA = "")
+kable(degree)
+```
+
+One of the things we see when we look at this data is that there is not much point in comparing in a systematic manner, since the sites are different for each phase. Only some sites occur in more than one phase, and only Mayen occurs in more than two. If you had the same sites in a network developing through time, this would be a worthwhile step.
+
+Another way we can look at a measure is by checking its distribution by phase. Of course you can do this in a table, but we will visualise it here using a ridge plot form the `ggridges` package.
+```{r comparing eigenvector distribution}
+centrality %>% 
+  select(phase, eigen) %>%   #select phase and eigenvector
+  mutate(phase = as.factor(phase)) %>% #make sure data type is correct
+  ggplot(                    #plot command
+    aes(x = eigen,           #eigenvalue on the x axis
+        y = phase,           #phase on the y axis
+        fill = phase)        #phase for the series
+  )+
+  geom_density_ridges()+  #show density of the distribution on the ridge plot
+  labs(title = "Michelsberg", 
+       subtitle = "distribution of eigenvector centrality" )+ #add some titles
+  theme_ridges()  #select a graph visual theme
+```
+
+# Animation
+
+Finally, just to whet your appetites, here is some code with which we can animate the networks to see the change over time. 
+```{r animate the networks}
+#For this, we will join the networks together, with a note on the edges to say what period they are from. You could also do this straight from the beginning.
+
+#Add phase column to edgelists
+mbk1edges <- mbk1edges %>% mutate(period = 1) %>% mutate(period = as.factor(period))
+mbk2edges <- mbk2edges %>% mutate(period = 2) %>% mutate(period = as.factor(period))
+mbk3edges <- mbk3edges %>% mutate(period = 3) %>% mutate(period = as.factor(period))
+mbk4edges <- mbk4edges %>% mutate(period = 4) %>% mutate(period = as.factor(period))
+
+#join all edgelists into one
+mbkedges <- bind_rows(mbk1edges, mbk2edges, mbk3edges, mbk4edges)
+
+#make the overall network
+mbknet <- tbl_graph(nodes = mbknodes, edges = mbkedges, directed = FALSE) %>% 
+  thresh.graph(4) # in this case, we will put a threshold in straight away
+
+#Now for the animation:
+p <- ggraph(mbknet, x = lon, y = lat)+  # we will choose a geographic layout
+  geom_edge_link(aes(color = period, width = weight))+ #make the edges larger if they are strong, and color by period
+  geom_node_point(aes(size = centrality_betweenness(weights = weight)))+ # size the nodes according to betweenness
+  theme_graph()+                 # layout the background
+  guides(size = FALSE, edge_width = FALSE)+  # keep only period in the legend
+    transition_states(period,          # variable for animation
+                    transition_length = 2, #length of transition
+                    state_length = 1) #length of each state
+anim <- animate(p)
+anim_save("michelsber.gif", anim)
+anim
+```
+Enjoy creating and evaluating your own networks using R!
 
