@@ -117,6 +117,7 @@ scale_edge_color_continuous(low = "lightblue", high = "red") +
 
 
 
+
 #networkvisualization2:
 The networks look very different. This comes from the different way they were built, especially because of the threshold in the co.p function (more about thresholds and filtering below). Both count the types each site shares. Because sites can share more than one type of pottery, the weight attribute of the edge shows how many types the sites share. This can be used to interpret the relationship between sites. 
 The different weights of edges can be visualized via aesthetic attributes used for each layer. This way it shows the edge layer in more depth.
