@@ -82,6 +82,10 @@ This data is now ready to be read into a network analysis package. You could als
 # Remove the '#' from the line below if you want to run this code
 # write.csv(mbk3mat, file = "put_your_file_name_here.csv")
 ```
+To save it for later use in R, make an R Data file
+```{r write Rda}
+save(mbk3mat, file = "mbk3mat.rda")
+```
 
 
 # Edge and node list format
@@ -158,3 +162,9 @@ mbk3nodes <- Michelsberg %>%
   rename(lon = x_utm32n, lat = y_utm32n, id = site_feature) #change some of the more unwieldy names
 ```
 You now have an edge list and a node list with names and coordinates of the sites. You are ready to go and do some network analysis.
+
+Follow the steps above to save as a .csv or and .rda file
+```{r save edge and node list}
+save(mbk3edges, mbk3nodes, file = "mbk3edgelist.rda")
+```
+
