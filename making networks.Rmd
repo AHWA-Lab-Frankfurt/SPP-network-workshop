@@ -24,6 +24,7 @@ These network objects (often also called graph objects) are used for all further
 ## Making a graph from an adjacency matrix
 
 In order to turn our data into a graph, we use the `as_tbl_graph()` function that `tidygraph` provides. This function can read a large number of different formats into a tidygraph object.
+
 ```{r creating network objects from adjacency matrix}
 mbk3Pnet <- tidygraph::as_tbl_graph(mbk3mat,           # use our Michelsberg matrix
                                     directed = FALSE)  # "directed = FALSE" makes sure that the function doesnt create a directed network
@@ -31,8 +32,10 @@ mbk3Pnet <- tidygraph::as_tbl_graph(mbk3mat,           # use our Michelsberg mat
 #Let's have a look at what we made. `View()` doesn't work with network objects, but it isn't necessary to look at objects anyway. An object can also just be looked at by calling its name as if it was a function.
 mbk3Pnet
 ```
+
 We can see that tidygraph creates an edgelist and a nodelist from our data. The sites are nodes and the edges are our calculated co-presence.
 
+## Making a graph from edge and node lists
 If we have an edgelist and nodelist, we can use the `tbl_graph()` function
 ```{r make network object from edgelist}
 #as_tbl_graph also works with node and edge lists. The function needs to be told which list to use for nodes and which list for edges. 
@@ -50,16 +53,16 @@ We now have a network! This can be analysed and visualised.
 In order to explore our network, it is often good to have a look at it first. Since the edge and node lists are essentially instructions for drawing a graph, this is what we will do in the first place. This explorative visualisation often allows us to generate first hypotheses.
 
 ```{r explorative visualisation}
-ggraph(mbk3Pnet,              # this first command is the base of the plot containing data and the layout, here the data is our network                                    graph based on the adjacency matrix
-       layout = "stress") +  # this layout is a standard layout that tries to minimize the overlapping of edges by positioning the nodes                                   according to their position in the network.
+ggraph(mbk3Pnet,              # this first command is the base of the plot containing data and the layout, here the data is our network graph based on the adjacency matrix
+       layout = "stress") +  # this layout is a standard layout that tries to minimize the overlapping of edges by positioning the nodes according to their position in the network.
             
     geom_edge_link() +  # with every layer (added with a +) we specify some new part of our network to the plot; first the edges 
     geom_node_point()+  # then the nodes plotted as points
-    geom_node_text(aes(label = name), color = "red")   # to distinguish the sites we add a layer that contains their names. The aes(label =                                 name) uses the names in the node list; the color="red" changes the color to make it easier to read. We will                                 later show more ways to manipulate the layers to make more information visible.
+    geom_node_text(aes(label = name), color = "red")   # to distinguish the sites we add a layer that contains their names. The aes(label = name) uses the names in the node list; the color="red" changes the color to make it easier to read. We will later show more ways to manipulate the layers to make more information visible.
   
 
 
- #Now we will visualise the network based on the edgelist.
+ #Now we will visualise the network based on the edgelist in almost the same way.
   ggraph(mbk3EPnet, layout = "graphopt") +
     geom_edge_link() +
     geom_node_point()+
@@ -75,44 +78,43 @@ The networks look very different. This comes from the different way they were bu
 
 Thresholds need to be set on a case-by-case basis, and due to external evidence. Based on the research question it might be appropriate to ignore certain amounts of pottery. If, for example, the production or local consumption is studied, pottery types that appear in very small amounts might be ignored. If on the other hand the focus lies on trade, even rare and exotic pottery might be important for the analysis. This, along with other forms of transformations, can be done in tidygraph, so there is no real need to set a threshold before. Doing it this way allows you to be flexible and try different thresholds. However, note that the threshold in the copresence function works differently from the one we are applying here. In tidygraph, we will *ignore connections below a specified weight*, while in the copresence function, we *ignore types below a specified percentage of the overall assemblage*.
 
-```{r filter}
+```{r filter edges}
 #as the network based on the edgelist is a "hairball", filtering the edges with the lowest weight can be used to give the network more structure.
 # ** Note: %>% , the so-called 'pipe operator', passes a dataset from one function to the next.
 
 mbk3EPnet %>%  # select the mbk3EPnet graph
   activate(edges) %>%  # select the edgelist for transformation
-  filter(weight >= 2) %>% # with filter we select all edges that have 2.5 or more weight
+  filter(weight >= 4) %>% # with filter we select all edges that have a weight of 4 or more 
   ggraph( layout = "stress") + # pass the transformed graph straight to the plotting environment. N.B. the changes are plotted but not saved to mbk3EPnet!
-#with every layer we add some new part of our network to the plot; first the edges;now the color of the edges is based on there weight. this way we can see which pottery share more than just a single object
-    geom_edge_link(aes(color = weight), alpha = 0.5) +
-scale_edge_color_continuous(low = "lightblue", high = "red") +
- #then the nodes plotted as points
-  geom_node_point()+
- #to distinguish the pottery we add a layer that contains there names. The aes(label = name) uses the names in the node list; the color="red" changes the color to make it easier to read. we will later show more ways to manipulate the layers to make more information vible
-  geom_node_text(aes(label = id), color = "red")
+    geom_edge_link(aes(color = weight), alpha = 0.5) +  # with aes(), we give aesthetic instructions. Here, we tell ggraph to color the edges according to their weight...
+    scale_edge_color_continuous(low = "lightgrey", high = "red") + # ...from light grey to red 
 
-
-mbk3EPnet %>% 
-  #we select the edgelist
-  activate(edges) %>% 
-  #with filter we select all edges that have 2.5 or more weight
-  filter(weight >= 4) %>% 
-  #selecting the node list 
-  activate(nodes) %>% 
-  #because now some sites might not be connected to the network anymore, we will filter them out to keep the graph cleaner
-  filter(!node_is_isolated()) %>% 
-#add the new graph into the 
-  ggraph( layout = "stress") +
-#with every layer we add some new part of our network to the plot; first the edges;now the color of the edges is based on there weight. this way we can see which pottery share more than just a single object
-    geom_edge_link(aes(color = weight), alpha = 4) +
-scale_edge_color_continuous(low = "lightblue", high = "red") +
- #then the nodes plotted as points
-  geom_node_point()+
- #to distinguish the pottery we add a layer that contains there names. The aes(label = name) uses the names in the node list; the color="red" changes the color to make it easier to read. we will later show more ways to manipulate the layers to make more information vible
-  geom_node_text(aes(label = id), color = "red")
-
-#we save
+    geom_node_point() + # then the nodes plotted as points
+    
+    geom_node_text(aes(label = site_name), color = "red")+ # site names as labels for the nodes, in red
+    theme_graph()  # a selection of themes is available. We like this one for its clarity
 ```
+
+This is quite a different network, isn't it? The colours we gave the edges show us which ones are strong and which ones are weak. But we have left some sites behind: Rauenthal, Wackenheim, and one phase of Urmitz are really not that well connected to the others. Maybe they got most of their pottery through a system of social exchanges with sites that we don't usually count as part of the MBK, or that we don't know about yet. To continue with the network we have, we will have to exclude them, which we do by filtering on the nodes.
+```{r filter nodes}
+# We will want to make a graph the same way again, and it would be a waste to type all of it out again. So we will save our layout. That shortens the code and can ensure that you have uniform graphics in your project.
+graphoptions <- list(
+    geom_edge_link(aes(color = weight), alpha = 0.5),  # color the edges according to their weight...
+    scale_edge_color_continuous(low = "lightgrey", high = "red"), # ...from light grey to red 
+    geom_node_point(), # then the nodes plotted as points
+    geom_node_text(aes(label = site_name), color = "red") # site names as labels for the nodes, in red)
+)
+
+#Now we will remove the outliers and make a graph
+mbk3EPnet %>%  # select the mbk3EPnet graph
+  activate(edges) %>%  # select the edgelist for transformation
+  filter(weight >= 4) %>% # with filter we select all edges that have a weight of 4 or more
+  activate(nodes) %>%   # select the nodelist for transformation
+  filter(!node_is_isolated()) %>% # the "node_is_isolated()" function looks for all isolated nodes. The ! says that we don't want these.
+  ggraph( layout = "stress")+ # pass transformed graph to ggraph and specify layout
+  graphoptions  # Here we call all the options we saved
+```
+A much better graph. We can see that there is a group at the center of the graph that appears to be quite well connected. Maybe we can make this a little clearer
 
 
 
