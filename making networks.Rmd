@@ -8,6 +8,7 @@ output: html_document
 library(tidygraph)
 library(ggraph)
 library(tidyverse)
+library(knitr)
 ```
 
 ```{r data import, echo=FALSE}
@@ -139,8 +140,6 @@ ggraph(threshgraph, layout = "stress") +
   scale_edge_color_continuous(low = "lightgrey", high = "red") + # color edges from light grey to red 
   scale_edge_width(range = c(0.2,2)) + # control the min and mx width of the edges
   
-  
-  
   geom_node_point()+ # then the nodes plotted as points
   geom_node_text(aes(label = site_name), color = "red")+ # site names as labels for the nodes, in red
   theme_graph() # clear theme
@@ -171,7 +170,7 @@ threshgraph
 ```
 
 If we hadn't done this, and had stored the data elsewhere, we could still add it now.
-```{r add node data, include=FALSE}
+```{r add node data, eval=FALSE}
 #extract the coordinates for the sites of our period from the data
  coords <- Michelsberg %>% # new dataset from Michelsberg data
   filter(mbk_phase == "III") %>%  # choose relevant phase
@@ -198,6 +197,7 @@ In our case, this makes the graph a little less readable, but it does show us wh
 
 # Centrality:
 
+## Degree centrality
 There are various statistical measurements for networks. Centrality scores are one of the most basic ones and give a good overview on the role of a node within a network. There are many different ways to calculate centralities. They are all based on the connectedness of the node. The weight of the connections can be considered but does not need to be taken into account. 
 
 The simplest centrality score is **degree centrality**. Degree centrality is the count of the edges connected to a node. It is a relatively plain measure for the role of a node as it shows if it has many connections or only few. A node with a low degree centrality is probably a more isolated node on the margins of the network, while node with a high degree centrality is well connected and in a more central position. In our network, degree centrality represents how many types (above the threshold) a site shares with any other.
@@ -233,7 +233,7 @@ This new dataset can now be used for further calculations or statistics. This ea
 degree %>% 
   arrange(-deg) %>%  # arrange column "deg" in descending order
   head(10) %>%   # select the top 10
-  knitr::kable()
+  kable()
 
 # We can also check the distribution of the degree centrality
 degree %>% 
@@ -249,93 +249,150 @@ degree %>%
   geom_point()
 ```
 
+But we do not have to export this, and instead we can simply put it in the network graph. Here, we don't even need to make a column saving the centrality values, because we can call their functions from within the plotting environment.
 
-
-
-```{r}
-
-  #selecting deg as a shown column
-  select(deg) %>% 
-  #arranging it descending
-  arrange(-deg)
-
-
-  ggraph(mbk3EPnet, layout = "stress") +
- geom_edge_link(aes(color = weight), alpha = 0.5) +
-scale_edge_color_continuous(low = "lightblue", high = "red") +
- #the function centtrality_degree() can be called directly as an attribute that will be visualized
-   geom_node_point(aes(size = centrality_degree(weights = weight)))+
-#labels are removed to make it less fuzzy
-  geom_node_text(aes(label = id), color = "red")
-   
-ggraph(mbk3EPnet, x = lon, y = lat) +
-#with every layer we add some new part of our network to the plot; first the edges;now the color of the edges is based on there weight. this way we can see which pottery share more than just a single object
-    geom_edge_link(aes(color = weight), alpha = 0.5) +
-scale_edge_color_continuous(low = "lightblue", high = "red") +
- #the function centtrality_degree() can be called directly as an attribute that will be visualized
-   geom_node_point(aes(size = centrality_degree(weights = weight)))
-#labels are removed to make it less fuzzy
-
+```{r degree centrality 4}
+ggraph (threshgraph, layout = "stress")+
+  geom_edge_link(     # specifies the type of edge
+    aes(              # adds aesthetic parameters
+        color = weight, # color the edges according to weight
+        width = weight  # make edges wider according to weight
+        ), alpha = 0.5) +  #make edges slightly translucent
+  
+  scale_edge_color_continuous(low = "lightgrey", high = "red") + # color edges from light grey to red 
+  scale_edge_width(range = c(0.2,2)) + # control the min and mx width of the edges
+  geom_node_point(aes(       # we add aesthetics to the nodes
+          size = centrality_degree(weights = weight)  # and specify that size should follow the weighted degree centrality
+          )
+      )+ 
+  geom_node_text(aes(label = site_name), color = "red")+ # site names as labels for the nodes, in red
+  theme_graph() + # clear theme
+  labs(title = "mbk3", 
+       subtitle =  "degree centrality") # we will add a title and a subtitle
 ```
 
-There are other centrality values for nodes. Two that are common too are eigenvector centrality and betweenness centrality. 
-Eigenvector centrality also called eigencentrality is based on the influence a node has on the network. The connection to another node with a high centrality score is rated higher than the one to a node with a low score. It can be interpreted as the importance of a node for the network. In an archaeological context it shows not only to how many sites a site is connected, but also how connected those sites are. When weighted the weight of the edges is also taken into account with a similar effect as for degree centrality.
-Betweeness centrality is computed by looking at how often a node is passed, when one would (metaphorically) walk from each node in the network to every other node in the network. The node with a high betweenness centrality are those lying on many paths. Typically those nodes are often those with a broker role connecting to subnetworks. The archaeological sites with a high betweenness centrality are those that contain objects from to otherwise more destinctive groups of sites. Betweenness is a difficult score for networks that are based on similarity (as most archaeological networks are), because they tend to form hairballs and there are seldom nodes that are only connected to one other node.
+
+## Eigenvector and betweenness centralities
+There are other centrality values for nodes. Two that are commonly used are: *eigenvector centrality* and *betweenness centrality*. 
+
+**Eigenvector centrality**, also called eigencentrality, is based on the influence a node has on the network. The connection to another node with a high centrality score is rated higher than the one to a node with a low score. It can be interpreted as the importance of a node for the network. In an archaeological context it shows not only to how many sites a site is connected, but also how connected those sites are. When weighted, the weight of the edges is also taken into account with a similar effect as for degree centrality.
+
+**Betweeness centrality** is computed by looking at how often a node is passed on the way from each node in the network to every other node in the network. Nodes with a high betweenness centrality are those lying on many paths. Typically those nodes are often those with a broker role connecting subnetworks. The archaeological sites with a high betweenness centrality are those that contain objects from to otherwise more destinctive groups of sites. Betweenness is a difficult score for networks that are based on similarity (as most archaeological networks are), because they tend to form hairballs and there are seldom nodes that are only connected to one other node.
 When it is weighted, the pathing sees those edges with a stronger weight as shorter paths and chooses them when calculating the "best" way from node to node. In general, when deciding if weights should be taken into account for centrality, it is always important to wonder if the amount of similarities a connection is based on is important.
+
+We will now make a table that compares the centralities and also make a plot for each
 ```{r eigenvector centrality & betweenness}
- ggraph(mbk3EPnet, layout = "stress") +
- geom_edge_link(aes(color = weight), alpha = 0.5) +
-scale_edge_color_continuous(low = "lightblue", high = "red") +
- #the function centrality_eigen() can be called directly as an attribute that will be visualized
-   geom_node_point(aes(size = centrality_eigen(weights = weight)))+
-#labels are removed to make it less fuzzy
-  geom_node_text(aes(label = id), color = "red")
+# Since we will be using these measures for several things, it will make sense to save them to the nodelist
+threshgraph <- threshgraph %>% 
+  activate(nodes) %>%   # select nodes for futher transformation
+  mutate(weighted_degree = centrality_degree(weights = weight),
+         weighted_eigen = centrality_eigen(weights = weight),
+         weighted_betweenness = centrality_betweenness(weights = weight)) 
+
+#Make a table
+threshgraph %>% 
+  select(site_name,
+         weighted_degree,
+         weighted_eigen,
+         weighted_betweenness) %>% # select relevant columns
+  as_tibble() %>% # change data format
+  arrange(-weighted_degree) %>% # arrange by highest degree
+  head(10) %>% # pick only the highest 10
+  kable(caption = "MBK Phase III weighted centralities") # make a table with a caption
+
+
+# Eigenvector centrality plot
+
+ggraph (threshgraph, layout = "stress")+
+  geom_edge_link(     # specifies the type of edge
+    aes(              # adds aesthetic parameters
+        color = weight, # color the edges according to weight
+        width = weight  # make edges wider according to weight
+        ), alpha = 0.5) +  #make edges slightly translucent
+  
+  scale_edge_color_continuous(low = "lightgrey", high = "red") + # color edges from light grey to red 
+  scale_edge_width(range = c(0.2,2)) + # control the min and mx width of the edges
+  geom_node_point(aes(       # we add aesthetics to the nodes
+          size = weighted_eigen  # and specify that size should follow the weighted degree centrality
+          )
+      )+ 
+  geom_node_text(aes(label = site_name), color = "red")+ # site names as labels for the nodes, in red
+  theme_graph() + # clear theme
+  labs(title = "mbk3", 
+       subtitle =  "eigenvector centrality") # we will add a title and a subtitle
    
-ggraph(mbk3EPnet, x = lon, y = lat) +
-#with every layer we add some new part of our network to the plot; first the edges;now the color of the edges is based on there weight. this way we can see which pottery share more than just a single object
-    geom_edge_link(aes(color = weight), alpha = 0.5) +
-scale_edge_color_continuous(low = "lightblue", high = "red") +
- #the function centrality_eigen() can be called directly as an attribute that will be visualized
-   geom_node_point(aes(size = centrality_eigen(weights = weight)))
-#labels are removed to make it less fuzzy
+
+# Betweenness centrality plot
+
+ggraph (threshgraph,layout = "stress")+
+  geom_edge_link(     # specifies the type of edge
+    aes(              # adds aesthetic parameters
+        color = weight, # color the edges according to weight
+        width = weight  # make edges wider according to weight
+        ), alpha = 0.5) +  #make edges slightly translucent
+  
+  scale_edge_color_continuous(low = "lightgrey", high = "red") + # color edges from light grey to red 
+  scale_edge_width(range = c(0.2,2)) + # control the min and mx width of the edges
+  geom_node_point(aes(       # we add aesthetics to the nodes
+          size = weighted_degree  # and specify that size should follow the weighted degree centrality
+          )
+      )+ 
+  geom_node_text(aes(label = site_name), color = "red")+ # site names as labels for the nodes, in red
+  theme_graph() + # clear theme
+  labs(title = "mbk3", 
+       subtitle =  "betweenness centrality") # we will add a title and a subtitle
+```
+We can see that in this case, there is a clear group of sites who have a corresponding level of high degree and eigenvector centralities. These are the most influential nodes in the network. They have pottery assemblages that display a balance between diversity and frequency: lots of different types occur there, and they occur in significant numbers. For our view of the network sharing these types, this means that these are places that are likely to have passed on information about pottery.
+
+The distribution of the betweenness centrality is somewhat different. We have some sites within the top 10 that have high and some that have low betweenness. The distribution is also more uneven, showing assenheim and rohrbach to be much more central to the connections between the sites in the network. 
+
+It would be important to check now in how far the centrality measures are correlated to outside factors, like the size of the assemblage. Do larger assemblages give higher degree and eigenvector centralities? That would have to be adjusted for, if it is true. But the way the data stands, we appear to be able to identify a core group of central sites which were instrumental in the spread of pottery types in Michelsberg Phase III.
 
 
-  ggraph(mbk3EPnet, layout = "stress") +
- geom_edge_link(aes(color = weight), alpha = 0.5) +
-scale_edge_color_continuous(low = "lightblue", high = "red") +
- #the function centrality_betweenness() can be called directly as an attribute that will be visualized
-   geom_node_point(aes(size = centrality_betweenness(weights = weight)))+
-#labels are removed to make it less fuzzy
-  geom_node_text(aes(label = id), color = "red")
-   
-ggraph(mbk3EPnet, x = lon, y = lat) +
-#with every layer we add some new part of our network to the plot; first the edges;now the color of the edges is based on there weight. this way we can see which pottery share more than just a single object
-    geom_edge_link(aes(color = weight), alpha = 0.5) +
-scale_edge_color_continuous(low = "lightblue", high = "red") +
- #the function centrality_betweenness() can be called directly as an attribute that will be visualized
-   geom_node_point(aes(size = centrality_betweenness(weights = weight)))
-#labels are removed to make it less fuzzy
+## Edge betweenness
 
+Betweenness can not only be calculated for nodes but also for edges. The process is the same, but now the focus is on how many paths an edge lies. If an edge is important for many paths it has a high edge betweenness. Those edges tend to be the connections between different subgroups.
+When weights are taken into account those edges with a stronger weight are often the ones with the highest betweenness as they are prefered for the pathing.
+
+```{r edge betweenness}
+# Unweighted
+
+ggraph (threshgraph,layout = "stress")+
+  geom_edge_link(     # specifies the type of edge
+    aes(              # adds aesthetic parameters
+        color = weight, # color the edges according to weight
+        width = centrality_edge_betweenness()  # make edges wider according to unweighted edge betweenness
+        ), alpha = 0.8) +  #make edges slightly translucent
+  
+  scale_edge_color_continuous(low = "lightgrey", high = "red") + # color edges from light grey to red 
+  scale_edge_width(range = c(0.2,2)) + # control the min and mx width of the edges
+  geom_node_point()+ # nodes as points
+  geom_node_text(aes(label = site_name), color = "red")+ # site names as labels for the nodes, in red
+  theme_graph() + # clear theme
+  labs(title = "mbk3", 
+       subtitle =  "betweenness centrality") # we will add a title and a subtitle
+
+
+# Weighted 
+
+ggraph (threshgraph,layout = "stress")+
+  geom_edge_link(     # specifies the type of edge
+    aes(              # adds aesthetic parameters
+        color = weight, # color the edges according to weight
+        width = centrality_edge_betweenness(weights = weight)  # make edges wider according to weighted edge betweenness
+        ), alpha = 0.8) +  #make edges slightly translucent
+  
+  scale_edge_color_continuous(low = "lightgrey", high = "red") + # color edges from light grey to red 
+  scale_edge_width(range = c(0.2,2)) + # control the min and mx width of the edges
+  geom_node_point()+ # nodes as points
+  geom_node_text(aes(label = site_name), color = "red")+ # site names as labels for the nodes, in red
+  theme_graph() + # clear theme
+  labs(title = "mbk3", 
+       subtitle =  "betweenness centrality") # we will add a title and a subtitle
 
 
 ```
 
-Betweenness can not only be calculated for nodes but also for edges. The process is the same, now the focus is on how many paths an edge lies. If an edge is important for many paths it has a high edge betweenness. Those edges might be the connections between different subgroups.
-When weights are taken into account those edges with a stronger weight are often the ones with the hightest betweenness as they are prefered for the pathing.
-```{r}
-ggraph(mbk3EPnet, layout = "stress") +
-#the function edge_betweenness() can be called directly as an attribute that will be visualized; as it is an attribute for edges it is called in the edge layer
-   geom_edge_link(aes(color = edge_betweenness(mbk3EPnet, weights = NULL)), alpha = 0.5) +
-  scale_edge_color_continuous(low = "lightblue", high = "red") +
-   geom_node_point()+  #simple geometry for the edges
-  geom_node_text(aes(label = id), color = "red")
+These graphs show us that high edge betweenness is not on high weight edges, but tends to follow low-weight edges external to the centre of the graph. If we had a graph with groups, then this is likely where we would see another group connected.
 
-ggraph(mbk3EPnet, layout = "stress") +
-#the function edge_betweenness() can be called directly as an attribute that will be visualized; as it is an attribute for edges it is called in the edge layer
-   geom_edge_link(aes(color = edge_betweenness(mbk3EPnet, weights = weight)), alpha = 0.5) +
-  scale_edge_color_continuous(low = "lightblue", high = "red") +
-   geom_node_point()+  #simple geometry for the edges
-  geom_node_text(aes(label = id), color = "red")
-
-```
-
+Many more measures can be applied to a graph, and it often depends on what you want to find out, what your data is like, and what your network ties are built on. But now you should know how to go about it. In the next part, we will show you how to compare networks in order to look at change.
