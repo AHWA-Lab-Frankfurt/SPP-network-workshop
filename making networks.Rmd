@@ -7,6 +7,7 @@ output: html_document
 ```{r libraries, echo=FALSE, message=FALSE, warning=FALSE}
 library(tidygraph)
 library(ggraph)
+library(tidyverse)
 ```
 
 ```{r data import, echo=FALSE}
@@ -71,9 +72,8 @@ ggraph(mbk3Pnet,              # this first command is the base of the plot conta
 
 What are the differences between the two networks?
 
-# Filtering, selecting and transforming networks
+# Transforming networks
 
-## Filtering
 The networks look very different. This comes from the different way they were built, especially because of the threshold in the co.p function. There was no threshold added in the edgelist function, so that all copresences, no matter how incidental, are represented here. In archaeological networks, this usually means that everything is connected to everything else, and we get a so-called "hairball" structure. The strong interconnnectedness of the graph shows that nearly all sites share at least 1-2 objects. This might suggest to us that the sites during MBK Phase III were all somewhat connected by a shared practice of pottery production, which is the basis for them to be grouped into a "culture" in the first place. 
 
 Thresholds need to be set on a case-by-case basis, and due to external evidence. Based on the research question it might be appropriate to ignore certain amounts of pottery. If, for example, the production or local consumption is studied, pottery types that appear in very small amounts might be ignored. If on the other hand the focus lies on trade, even rare and exotic pottery might be important for the analysis. This, along with other forms of transformations, can be done in tidygraph, so there is no real need to set a threshold before. Doing it this way allows you to be flexible and try different thresholds. However, note that the threshold in the copresence function works differently from the one we are applying here. In tidygraph, we will *ignore connections below a specified weight*, while in the copresence function, we *ignore types below a specified percentage of the overall assemblage*.
@@ -92,7 +92,7 @@ mbk3EPnet %>%  # select the mbk3EPnet graph
     geom_node_point() + # then the nodes plotted as points
     
     geom_node_text(aes(label = site_name), color = "red")+ # site names as labels for the nodes, in red
-    theme_graph()  # a selection of themes is available. We like this one for its clarity
+    theme_graph()  # a selection of themes is available. We like this one for its clarity. You can easily make you own.
 ```
 
 This is quite a different network, isn't it? The colours we gave the edges show us which ones are strong and which ones are weak. But we have left some sites behind: Rauenthal, Wackenheim, and one phase of Urmitz are really not that well connected to the others. Maybe they got most of their pottery through a system of social exchanges with sites that we don't usually count as part of the MBK, or that we don't know about yet. To continue with the network we have, we will have to exclude them, which we do by filtering on the nodes.
@@ -102,7 +102,8 @@ graphoptions <- list(
     geom_edge_link(aes(color = weight), alpha = 0.5),  # color the edges according to their weight...
     scale_edge_color_continuous(low = "lightgrey", high = "red"), # ...from light grey to red 
     geom_node_point(), # then the nodes plotted as points
-    geom_node_text(aes(label = site_name), color = "red") # site names as labels for the nodes, in red)
+    geom_node_text(aes(label = site_name), color = "red"), # site names as labels for the nodes, in red)
+    theme_graph()  # clear theme
 )
 
 #Now we will remove the outliers and make a graph
@@ -114,183 +115,158 @@ mbk3EPnet %>%  # select the mbk3EPnet graph
   ggraph( layout = "stress")+ # pass transformed graph to ggraph and specify layout
   graphoptions  # Here we call all the options we saved
 ```
-A much better graph. We can see that there is a group at the center of the graph that appears to be quite well connected. Maybe we can make this a little clearer
+
+A much better graph. We can see that there is a group at the center of the graph that appears to be quite well connected. Maybe we can make this a little clearer.
+
+```{r save thresh and layout edges}
+# Since we have now settled on our thresholded and cleaned network, there is no reason to type all of the lines over and over again. We will simply save it for further use.
+threshgraph <-   # this is our new file name.
+  mbk3EPnet %>%  # select the mbk3EPnet graph
+  activate(edges) %>%  # select the edgelist for transformation
+  filter(weight >= 4) %>% # with filter we select all edges that have a weight of 4 or more
+  activate(nodes) %>%   # select the nodelist for transformation
+  filter(!node_is_isolated()) # remove isolated nodes
+
+
+# Now we will work on the edges of the plot
+ggraph(threshgraph, layout = "stress") +
+  geom_edge_link(     # specifies the type of edge
+    aes(              # adds aesthetic parameters
+        color = weight, # color the edges according to weight
+        width = weight  # make edges wider according to weight
+        ), alpha = 0.5) +  #make edges slightly translucent
+  
+  scale_edge_color_continuous(low = "lightgrey", high = "red") + # color edges from light grey to red 
+  scale_edge_width(range = c(0.2,2)) + # control the min and mx width of the edges
+  
+  
+  
+  geom_node_point()+ # then the nodes plotted as points
+  geom_node_text(aes(label = site_name), color = "red")+ # site names as labels for the nodes, in red
+  theme_graph() # clear theme
+
+#We will update our graph options accordingly
+graphoptions <- list(
+  geom_edge_link(     # specifies the type of edge
+    aes(              # adds aesthetic parameters
+        color = weight, # color the edges according to weight
+        width = weight  # make edges wider according to weight
+        ), alpha = 0.5) ,  #make edges slightly translucent
+  
+  scale_edge_color_continuous(low = "lightgrey", high = "red") , # color edges from light grey to red 
+  scale_edge_width(range = c(0.2,2)) , # control the min and mx width of the edges
+  geom_node_point(), # then the nodes plotted as points
+  geom_node_text(aes(label = site_name), color = "red"), # site names as labels for the nodes, in red
+  theme_graph() # clear theme
+)
+```
+
+Now you see that you can use the elements of the edge list in various ways to control the representation of the graph in ggplot, so you can get the graph that shows what you want it to show. 
+
+You can also use the elements from the node list. In order to illustrate one way of doing this, we will use a frequently needed example: geographic layouts. For this, we want our nodes on the graph to correspond to their positions in the landscape.
+
+We already have this data in our nodelist, because we included it before. It is "lon" and "lat" 
+```{r show nodelist}
+threshgraph
+```
+
+If we hadn't done this, and had stored the data elsewhere, we could still add it now.
+```{r add node data, include=FALSE}
+#extract the coordinates for the sites of our period from the data
+ coords <- Michelsberg %>% # new dataset from Michelsberg data
+  filter(mbk_phase == "III") %>%  # choose relevant phase
+   select(x_utm32n, y_utm32n)  # we select the both columns containing the longitude and latitude
+  
+  
+mbk3Pnet <- mbk3Pnet %>% # save the network
+  activate(nodes) %>%  # select the nodes for transformation
+  mutate("lon" = coords$x_utm32n, "lat" = coords$y_utm32n)  # add the columns for lon and lat from the coords dataset
+
+rm(coords)  #remove the coordinates dataset
+```
+
+Now, let us use these columns in order to lay out the graph:
+
+```{r map layout}
+# instead of specifying a layout, we here specify the x and y axes.
+ggraph(threshgraph,
+       x= lon,  
+       y = lat) +
+   graphoptions  # use the saved options
+```
+In our case, this makes the graph a little less readable, but it does show us where our well-connected core group is located.
+
+# Centrality:
+
+There are various statistical measurements for networks. Centrality scores are one of the most basic ones and give a good overview on the role of a node within a network. There are many different ways to calculate centralities. They are all based on the connectedness of the node. The weight of the connections can be considered but does not need to be taken into account. 
+
+The simplest centrality score is **degree centrality**. Degree centrality is the count of the edges connected to a node. It is a relatively plain measure for the role of a node as it shows if it has many connections or only few. A node with a low degree centrality is probably a more isolated node on the margins of the network, while node with a high degree centrality is well connected and in a more central position. In our network, degree centrality represents how many types (above the threshold) a site shares with any other.
+
+If the degree centrality is weighted, it is the sum of the weight of the edges a node has. Therefore it not only shows how many connections a node has but also how strong they are. This often helps to get a more distinctive view on its role in the network.
+```{r degree centrality 1}
+threshgraph %>% 
+   activate(nodes) %>% # select nodes for further transformation
+   mutate(deg = centrality_degree(), # add a column called 'deg' to the node list, which contains degree centrality
+          wdeg = centrality_degree() # add a column that contains weighted degree centrality
+          )
+```
 
 
 
 
-#networkvisualization2:
-The networks look very different. This comes from the different way they were built, especially because of the threshold in the co.p function (more about thresholds and filtering below). Both count the types each site shares. Because sites can share more than one type of pottery, the weight attribute of the edge shows how many types the sites share. This can be used to interpret the relationship between sites. 
-The different weights of edges can be visualized via aesthetic attributes used for each layer. This way it shows the edge layer in more depth.
+```{r degree centrality2}
+# now we can take this data out of the network into a table of its own:
+degree <-   # make a new dataset
+threshgraph %>% 
+   activate(nodes) %>% # select nodes for further transformation
+   mutate(deg = centrality_degree(), # add a column called 'deg' to the node list, which contains degree centrality
+          wdeg = centrality_degree(weights = weight) # add a column that contains weighted degree centrality
+          ) %>% 
+  select(id, deg, wdeg ) %>%  # choose the columns we are interested in
+  as_tibble() # turn from network into a table
+```
+
+This new dataset can now be used for further calculations or statistics. This easy creation of new datasets are one of the strenghts of using R in contrast to dedicated SNA tools.
+
+```{r degree centrality3}
+# We can make a table to see the highest scoring nodes
+degree %>% 
+  arrange(-deg) %>%  # arrange column "deg" in descending order
+  head(10) %>%   # select the top 10
+  knitr::kable()
+
+# We can also check the distribution of the degree centrality
+degree %>% 
+  select (deg) %>% 
+  
+  ggplot(aes(x = deg))+  #explaining R plotting functions is too much for this wokshop
+  geom_density()
+
+# Or plot the weighted and unweighted degrees against each other
+
+degree %>% 
+  ggplot(aes(x = deg, y = wdeg))+
+  geom_point()
+```
+
+
+
+
 ```{r}
- ggraph(mbk3Pnet, layout = "stress") +
-#with every layer we add some new part of our network to the plot; first the edges;now the width of the edges is based on there weight. this way we can see which pottery share more than just a single object
-    geom_edge_link(aes(edge_width = weight), alpha = 0.5) +
- #then the nodes plotted as points
-  geom_node_point()+
-#to distinguish the pottery we add a layer that contains there names. The aes(label = name) uses the names in the node list; the color="red" changes the color to make it easier to read. we will later show more ways to manipulate the layers to make more information vible
-   geom_node_text(aes(label = name), color = "red")
-  
 
-ggraph(mbk3Pnet, layout = "stress") +
-#with every layer we add some new part of our network to the plot; first the edges;now the color of the edges is based on there weight. this way we can see which pottery share more than just a single object
-    geom_edge_link(aes(color = weight), alpha = 0.5) +
-  #we can scale the color of the edges and a color palette based on the color for the lowest and the color for the highest value
-scale_edge_color_continuous(low = "lightblue", high = "red") +
-   #then the nodes plotted as points
-  geom_node_point()+
- #to distinguish the pottery we add a layer that contains there names. The aes(label = name) uses the names in the node list; the color="red" changes the color to make it easier to read. we will later show more ways to manipulate the layers to make more information vible
-   geom_node_text(aes(label = name), color = "red")
-  
-
-
-ggraph(mbk3EPnet, layout = "stress") +
-#with every layer we add some new part of our network to the plot; first the edges;now the color of the edges is based on there weight. this way we can see which pottery share more than just a single object
-    geom_edge_link(aes(color = weight), alpha = 0.5) +
-scale_edge_color_continuous(low = "lightblue", high = "red") +
-  #then the nodes plotted as points
-  geom_node_point()+
- #to distinguish the pottery we add a layer that contains there names. The aes(label = name) uses the names in the node list; the color="red" changes the color to make it easier to read. we will later show more ways to manipulate the layers to make more information vible
-  geom_node_text(aes(label = id), color = "red")
-
-
-```
-
-#filtering edges:
-The nodes and edges a network contains can be filtered in multiple ways. With excluding every site that was not from MBK III, the nodes where already filtered. Of course this could have been also done based on other criteria like the type of site etc.. Often the non connected nodes are filtered to make the network more handy.
-In our example network (mbk3EPnet) nearly every site is connected to every other site. Those networks are called "hairball networks" and often appear when the network is based on copresence (as 1 pottery type connects several sites to each other). As it is pretty difficult to analyze those graphs, it can be usefull to filter out small edges.
-The strong interconnnectedness of the graph shows that nearly every site shares atleast 1-2 objects. This tells us that the MBK-sites of this period where all somewhat connected by a shared practice of pottery production (#maybe to early for this bold statement). If we are only
-```{r}
-#as the network based on edges is now clearer, but still like a "hairball", filtering the edges with the lowest weight can be used to give the network more structure.
-#first we select the mbk3EPnet graph
-mbk3EPnet %>% 
-  #we select the edgelist
-  activate(edges) %>% 
-  #with filter we select all edges that have 2.5 or more weight
-  filter(weight >= 2) %>% 
-#add the new graph into the 
-  ggraph( layout = "stress") +
-#with every layer we add some new part of our network to the plot; first the edges;now the color of the edges is based on there weight. this way we can see which pottery share more than just a single object
-    geom_edge_link(aes(color = weight), alpha = 0.5) +
-scale_edge_color_continuous(low = "lightblue", high = "red") +
- #then the nodes plotted as points
-  geom_node_point()+
- #to distinguish the pottery we add a layer that contains there names. The aes(label = name) uses the names in the node list; the color="red" changes the color to make it easier to read. we will later show more ways to manipulate the layers to make more information vible
-  geom_node_text(aes(label = id), color = "red")
-
-
-mbk3EPnet %>% 
-  #we select the edgelist
-  activate(edges) %>% 
-  #with filter we select all edges that have 2.5 or more weight
-  filter(weight >= 4) %>% 
-  #selecting the node list 
-  activate(nodes) %>% 
-  #because now some sites might not be connected to the network anymore, we will filter them out to keep the graph cleaner
-  filter(!node_is_isolated()) %>% 
-#add the new graph into the 
-  ggraph( layout = "stress") +
-#with every layer we add some new part of our network to the plot; first the edges;now the color of the edges is based on there weight. this way we can see which pottery share more than just a single object
-    geom_edge_link(aes(color = weight), alpha = 4) +
-scale_edge_color_continuous(low = "lightblue", high = "red") +
- #then the nodes plotted as points
-  geom_node_point()+
- #to distinguish the pottery we add a layer that contains there names. The aes(label = name) uses the names in the node list; the color="red" changes the color to make it easier to read. we will later show more ways to manipulate the layers to make more information vible
-  geom_node_text(aes(label = id), color = "red")
-
-#we save
-```
-While the method above filters out those connections that are below a wanted weight. The threshold part of the copresence matrix works a little bit different. We could also filter out the weakest edges here. But it was already filtered via the treshhold of 0.2. The threshold does not filter the edgelist instead it excludes all pottery that makes up less than a certain amount of the sites assemblage (threshold = 0.2 -> only pottery above 20% is taken into account). The threshold can be adjusted when using the co.p()-function. As we create a new copresence matrix every time we need to repeat the network creation process. 
-The threshold needs to be archaeologically justified.Based on the research question it might be appropriate to ignore certain amounts of pottery. If, for example, the production or local consumption is studied, pottery types that appear in very small amounts might be ignored. If on the other hand the focus lies on trade, even rare and exotic pottery might be important for the analysis.
-```{r higher thresh}
-co.p(mbk3, thresh = 0.25) %>% 
-  as_tbl_graph() %>% 
-  activate(nodes) %>% 
-  filter(!node_is_isolated()) %>% 
-  ggraph(layout = "stress") +
-#with every layer we add some new part of our network to the plot; first the edges;now the color of the edges is based on there weight. this way we can see which pottery share more than just a single object
-    geom_edge_link(aes(color = weight), alpha = 0.5) +
-scale_edge_color_continuous(low = "lightblue", high = "red") +
-  geom_node_point()+
-  geom_node_text(aes(label = name))
-
-```
-In this part you can enter the threshold, to check how it affects the network. For example by using a tresh of 0.01 nearly all pottery types will be taken into account as they make up more than 1% of the sites assemblage.
-```{r  higher threshhold test it yourself}
-# behind "thresh =" you can enter a threshold you want to test. It is often useful to experiment with higher or lower thresholds to see how it affects the network. 
-co.p(mbk3, thresh = 0.01) %>% 
-  as_tbl_graph() %>% 
-  activate(nodes) %>% 
-  filter(!node_is_isolated()) %>% 
-  ggraph(layout = "stress") +
-#with every layer we add some new part of our network to the plot; first the edges;now the color of the edges is based on there weight. this way we can see which pottery share more than just a single object
-    geom_edge_link(aes(color = weight), alpha = 0.5) +
-scale_edge_color_continuous(low = "lightblue", high = "red") +
-  geom_node_point()+
-  geom_node_text(aes(label = name))
-```
-
-#working with the node list/visualisation3: 
-Maybe you want to compare the network to the landscape to check if geographic position plays a role for the connections. As we have coordinates in our data, but not yet in our network data. we need to add it first. The data can be added to the node list (if it is sitedata) or to the edgelist(if it would be data regarding the connection).
-```{r nodelist and coords}
-#we extract the coordinates for the sites of our period from the data
- coords <- Michelsberg %>% 
-  #for the start we only want one phase
-  filter(mbk_phase == "III") %>%
- #we select the both columns containing the longitude and latitude
-   select(x_utm32n, y_utm32n)
-  
-  
-mbk3Pnet <- mbk3Pnet %>% 
-  activate(nodes) %>% 
-  mutate("lon" = coords$x_utm32n, "lat" = coords$y_utm32n)
-  
-mbk3Pnet
-
-#To use coordinates, x = lon & y = lat are used instead of a layout based on the position inside a network
-ggraph(mbk3Pnet, x = lon, y = lat) +
-#with every layer we add some new part of our network to the plot; first the edges;now the color of the edges is based on there weight. this way we can see which pottery share more than just a single object
-    geom_edge_link(aes(color = weight), alpha = 0.5) +
-scale_edge_color_continuous(low = "lightblue", high = "red") +
-  geom_node_point()
-#labels are removed to make it less fuzzy
-
-#To use coordinates, x = lon & y = lat are used instead of a layout based on the position inside a network
-ggraph(mbk3EPnet, x = lon, y = lat) +
-#with every layer we add some new part of our network to the plot; first the edges;now the color of the edges is based on there weight. this way we can see which pottery share more than just a single object
-    geom_edge_link(aes(color = weight), alpha = 0.5) +
-scale_edge_color_continuous(low = "lightblue", high = "red") +
-  geom_node_point()
-#labels are removed to make it less fuzzy
-```
-
-
-#Centrality:
-There are various statistical measurements for networks. Centrality scores are one of the most basic ones and give a good overview on the role of the node. There are many different ways to calculate centralities. They are all based on the connectedness of the node, the weight of the connections can be considered but does not need to be taken into account. 
-The simplest centrality score is "degree centrality". It just counts the edges a node has. It is a relatively plain measure for the role of a node as it shows if it has many connections or only few. A node with a low "degree centrality" is probably a more isolated node on the margins of the network, while node with a high "degree centrality" is well connected and in a more central position. As the connections in archeological data are often based on similar artifacts, "degree centrality" indicates how similar the assemblage of a site is to others in the network.
-If the "degree centrality" is weighted, it is the sum of the weight of the edges a node has. Therefore it not only shows how many connections a node has but also how strong they are. This often helps to get a more distinctive view on its role in the network.
-```{r degree centrality}
-library(igraph)
-mbk3EPnet %>% 
- #activating the node list to add the degree centrality score there
-   activate(nodes) %>% 
-  #adding the column deg to the node list
-  mutate(deg = centrality_degree()) %>% 
-  #getting only the node list as a dataframe
-  igraph::get.data.frame(what = c("vertices")) %>% 
   #selecting deg as a shown column
   select(deg) %>% 
   #arranging it descending
   arrange(-deg)
 
 
-  ggraph()
+  ggraph(mbk3EPnet, layout = "stress") +
  geom_edge_link(aes(color = weight), alpha = 0.5) +
 scale_edge_color_continuous(low = "lightblue", high = "red") +
  #the function centtrality_degree() can be called directly as an attribute that will be visualized
    geom_node_point(aes(size = centrality_degree(weights = weight)))+
 #labels are removed to make it less fuzzy
-geom_text(aes(name = id), color = "red")
+  geom_node_text(aes(label = id), color = "red")
    
 ggraph(mbk3EPnet, x = lon, y = lat) +
 #with every layer we add some new part of our network to the plot; first the edges;now the color of the edges is based on there weight. this way we can see which pottery share more than just a single object
@@ -302,5 +278,64 @@ scale_edge_color_continuous(low = "lightblue", high = "red") +
 
 ```
 
+There are other centrality values for nodes. Two that are common too are eigenvector centrality and betweenness centrality. 
+Eigenvector centrality also called eigencentrality is based on the influence a node has on the network. The connection to another node with a high centrality score is rated higher than the one to a node with a low score. It can be interpreted as the importance of a node for the network. In an archaeological context it shows not only to how many sites a site is connected, but also how connected those sites are. When weighted the weight of the edges is also taken into account with a similar effect as for degree centrality.
+Betweeness centrality is computed by looking at how often a node is passed, when one would (metaphorically) walk from each node in the network to every other node in the network. The node with a high betweenness centrality are those lying on many paths. Typically those nodes are often those with a broker role connecting to subnetworks. The archaeological sites with a high betweenness centrality are those that contain objects from to otherwise more destinctive groups of sites. Betweenness is a difficult score for networks that are based on similarity (as most archaeological networks are), because they tend to form hairballs and there are seldom nodes that are only connected to one other node.
+When it is weighted, the pathing sees those edges with a stronger weight as shorter paths and chooses them when calculating the "best" way from node to node. In general, when deciding if weights should be taken into account for centrality, it is always important to wonder if the amount of similarities a connection is based on is important.
+```{r eigenvector centrality & betweenness}
+ ggraph(mbk3EPnet, layout = "stress") +
+ geom_edge_link(aes(color = weight), alpha = 0.5) +
+scale_edge_color_continuous(low = "lightblue", high = "red") +
+ #the function centrality_eigen() can be called directly as an attribute that will be visualized
+   geom_node_point(aes(size = centrality_eigen(weights = weight)))+
+#labels are removed to make it less fuzzy
+  geom_node_text(aes(label = id), color = "red")
+   
+ggraph(mbk3EPnet, x = lon, y = lat) +
+#with every layer we add some new part of our network to the plot; first the edges;now the color of the edges is based on there weight. this way we can see which pottery share more than just a single object
+    geom_edge_link(aes(color = weight), alpha = 0.5) +
+scale_edge_color_continuous(low = "lightblue", high = "red") +
+ #the function centrality_eigen() can be called directly as an attribute that will be visualized
+   geom_node_point(aes(size = centrality_eigen(weights = weight)))
+#labels are removed to make it less fuzzy
 
+
+  ggraph(mbk3EPnet, layout = "stress") +
+ geom_edge_link(aes(color = weight), alpha = 0.5) +
+scale_edge_color_continuous(low = "lightblue", high = "red") +
+ #the function centrality_betweenness() can be called directly as an attribute that will be visualized
+   geom_node_point(aes(size = centrality_betweenness(weights = weight)))+
+#labels are removed to make it less fuzzy
+  geom_node_text(aes(label = id), color = "red")
+   
+ggraph(mbk3EPnet, x = lon, y = lat) +
+#with every layer we add some new part of our network to the plot; first the edges;now the color of the edges is based on there weight. this way we can see which pottery share more than just a single object
+    geom_edge_link(aes(color = weight), alpha = 0.5) +
+scale_edge_color_continuous(low = "lightblue", high = "red") +
+ #the function centrality_betweenness() can be called directly as an attribute that will be visualized
+   geom_node_point(aes(size = centrality_betweenness(weights = weight)))
+#labels are removed to make it less fuzzy
+
+
+
+```
+
+Betweenness can not only be calculated for nodes but also for edges. The process is the same, now the focus is on how many paths an edge lies. If an edge is important for many paths it has a high edge betweenness. Those edges might be the connections between different subgroups.
+When weights are taken into account those edges with a stronger weight are often the ones with the hightest betweenness as they are prefered for the pathing.
+```{r}
+ggraph(mbk3EPnet, layout = "stress") +
+#the function edge_betweenness() can be called directly as an attribute that will be visualized; as it is an attribute for edges it is called in the edge layer
+   geom_edge_link(aes(color = edge_betweenness(mbk3EPnet, weights = NULL)), alpha = 0.5) +
+  scale_edge_color_continuous(low = "lightblue", high = "red") +
+   geom_node_point()+  #simple geometry for the edges
+  geom_node_text(aes(label = id), color = "red")
+
+ggraph(mbk3EPnet, layout = "stress") +
+#the function edge_betweenness() can be called directly as an attribute that will be visualized; as it is an attribute for edges it is called in the edge layer
+   geom_edge_link(aes(color = edge_betweenness(mbk3EPnet, weights = weight)), alpha = 0.5) +
+  scale_edge_color_continuous(low = "lightblue", high = "red") +
+   geom_node_point()+  #simple geometry for the edges
+  geom_node_text(aes(label = id), color = "red")
+
+```
 
