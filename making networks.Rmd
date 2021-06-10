@@ -117,6 +117,7 @@ mbk3EPnet %>%  # select the mbk3EPnet graph
   graphoptions  # Here we call all the options we saved
 ```
 
+<<<<<<< HEAD
 A much better graph. We can see that there is a group at the center of the graph that appears to be quite well connected. Maybe we can make this a little clearer.
 
 ```{r save thresh and layout edges}
@@ -139,6 +140,19 @@ ggraph(threshgraph, layout = "stress") +
   
   scale_edge_color_continuous(low = "lightgrey", high = "red") + # color edges from light grey to red 
   scale_edge_width(range = c(0.2,2)) + # control the min and mx width of the edges
+=======
+#networkvisualization2:
+The networks look very different. This comes from the different way they were built, especially because of the threshold in the co.p function (more about thresholds and filtering below). Both count the types each site shares. Because sites can share more than one type of pottery, the weight attribute of the edge shows how many types the sites share. This can be used to interpret the relationship between sites. 
+The different weights of edges can be visualized via aesthetic attributes used for each layer. This way it shows the edge layer in more depth.
+```{r}
+ ggraph(mbk3Pnet, layout = "stress") +
+#with every layer we add some new part of our network to the plot; first the edges;now the width of the edges is based on there weight. this way we can see which pottery share more than just a single object
+    geom_edge_link(aes(edge_width = weight), alpha = 0.5) +
+ #then the nodes plotted as points
+  geom_node_point()+
+#to distinguish the pottery we add a layer that contains there names. The aes(label = name) uses the names in the node list; the color="red" changes the color to make it easier to read. we will later show more ways to manipulate the layers to make more information vible
+   geom_node_text(aes(label = name), color = "red")
+>>>>>>> 9ad35048f0f72ba2304f81be668d1872f74b85ce
   
   geom_node_point()+ # then the nodes plotted as points
   geom_node_text(aes(label = site_name), color = "red")+ # site names as labels for the nodes, in red
