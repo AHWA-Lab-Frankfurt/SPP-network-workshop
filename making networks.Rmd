@@ -6,6 +6,7 @@ output: html_document
 ---
 ```{r libraries, echo=FALSE, message=FALSE, warning=FALSE}
 library(tidygraph)
+library(ggraph)
 ```
 
 ```{r data import, echo=FALSE}
@@ -64,10 +65,60 @@ ggraph(mbk3Pnet,              # this first command is the base of the plot conta
   ggraph(mbk3EPnet, layout = "graphopt") +
     geom_edge_link() +
     geom_node_point()+
-    geom_node_text(aes(label = id), color = "red")
+    geom_node_text(aes(label = site_name), color = "red")
 ```
 
 What are the differences between the two networks?
+
+# Filtering, selecting and transforming networks
+
+## Filtering
+The networks look very different. This comes from the different way they were built, especially because of the threshold in the co.p function. There was no threshold added in the edgelist function, so that all copresences, no matter how incidental, are represented here. In archaeological networks, this usually means that everything is connected to everything else, and we get a so-called "hairball" structure. The strong interconnnectedness of the graph shows that nearly all sites share at least 1-2 objects. This might suggest to us that the sites during MBK Phase III were all somewhat connected by a shared practice of pottery production, which is the basis for them to be grouped into a "culture" in the first place. 
+
+Thresholds need to be set on a case-by-case basis, and due to external evidence. Based on the research question it might be appropriate to ignore certain amounts of pottery. If, for example, the production or local consumption is studied, pottery types that appear in very small amounts might be ignored. If on the other hand the focus lies on trade, even rare and exotic pottery might be important for the analysis. This, along with other forms of transformations, can be done in tidygraph, so there is no real need to set a threshold before. Doing it this way allows you to be flexible and try different thresholds. However, note that the threshold in the copresence function works differently from the one we are applying here. In tidygraph, we will *ignore connections below a specified weight*, while in the copresence function, we *ignore types below a specified percentage of the overall assemblage*.
+
+```{r filter}
+#as the network based on the edgelist is a "hairball", filtering the edges with the lowest weight can be used to give the network more structure.
+# ** Note: %>% , the so-called 'pipe operator', passes a dataset from one function to the next.
+
+mbk3EPnet %>%  # select the mbk3EPnet graph
+  activate(edges) %>%  # select the edgelist for transformation
+  filter(weight >= 2) %>% # with filter we select all edges that have 2.5 or more weight
+  ggraph( layout = "stress") + # pass the transformed graph straight to the plotting environment. N.B. the changes are plotted but not saved to mbk3EPnet!
+#with every layer we add some new part of our network to the plot; first the edges;now the color of the edges is based on there weight. this way we can see which pottery share more than just a single object
+    geom_edge_link(aes(color = weight), alpha = 0.5) +
+scale_edge_color_continuous(low = "lightblue", high = "red") +
+ #then the nodes plotted as points
+  geom_node_point()+
+ #to distinguish the pottery we add a layer that contains there names. The aes(label = name) uses the names in the node list; the color="red" changes the color to make it easier to read. we will later show more ways to manipulate the layers to make more information vible
+  geom_node_text(aes(label = id), color = "red")
+
+
+mbk3EPnet %>% 
+  #we select the edgelist
+  activate(edges) %>% 
+  #with filter we select all edges that have 2.5 or more weight
+  filter(weight >= 4) %>% 
+  #selecting the node list 
+  activate(nodes) %>% 
+  #because now some sites might not be connected to the network anymore, we will filter them out to keep the graph cleaner
+  filter(!node_is_isolated()) %>% 
+#add the new graph into the 
+  ggraph( layout = "stress") +
+#with every layer we add some new part of our network to the plot; first the edges;now the color of the edges is based on there weight. this way we can see which pottery share more than just a single object
+    geom_edge_link(aes(color = weight), alpha = 4) +
+scale_edge_color_continuous(low = "lightblue", high = "red") +
+ #then the nodes plotted as points
+  geom_node_point()+
+ #to distinguish the pottery we add a layer that contains there names. The aes(label = name) uses the names in the node list; the color="red" changes the color to make it easier to read. we will later show more ways to manipulate the layers to make more information vible
+  geom_node_text(aes(label = id), color = "red")
+
+#we save
+```
+
+
+
+
 
 #networkvisualization2:
 The networks look very different. This comes from the different way they were built, especially because of the threshold in the co.p function (more about thresholds and filtering below). Both count the types each site shares. Because sites can share more than one type of pottery, the weight attribute of the edge shows how many types the sites share. This can be used to interpret the relationship between sites. 
