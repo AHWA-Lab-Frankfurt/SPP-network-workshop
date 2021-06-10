@@ -117,7 +117,6 @@ mbk3EPnet %>%  # select the mbk3EPnet graph
   graphoptions  # Here we call all the options we saved
 ```
 
-
 A much better graph. We can see that there is a group at the center of the graph that appears to be quite well connected. Maybe we can make this a little clearer.
 
 ```{r save thresh and layout edges}
@@ -140,7 +139,7 @@ ggraph(threshgraph, layout = "stress") +
   
   scale_edge_color_continuous(low = "lightgrey", high = "red") + # color edges from light grey to red 
   scale_edge_width(range = c(0.2,2)) + # control the min and mx width of the edges
-
+  
   geom_node_point()+ # then the nodes plotted as points
   geom_node_text(aes(label = site_name), color = "red")+ # site names as labels for the nodes, in red
   theme_graph() # clear theme
