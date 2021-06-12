@@ -5,6 +5,9 @@ date: "6/3/2021"
 output: html_document
 ---
 ```{r libraries, echo=FALSE, message=FALSE, warning=FALSE}
+install.packages("tidygraph")
+install.packages("ggraph")
+
 library(tidygraph)
 library(ggraph)
 library(tidyverse)
@@ -28,7 +31,7 @@ These network objects (often also called graph objects) are used for all further
 In order to turn our data into a graph, we use the `as_tbl_graph()` function that `tidygraph` provides. This function can read a large number of different formats into a tidygraph object.
 
 ```{r creating network objects from adjacency matrix}
-mbk3Pnet <- tidygraph::as_tbl_graph(mbk3mat,           # use our Michelsberg matrix
+mbk3Pnet <- as_tbl_graph(mbk3mat,           # use our Michelsberg matrix
                                     directed = FALSE)  # "directed = FALSE" makes sure that the function doesnt create a directed network
 
 #Let's have a look at what we made. `View()` doesn't work with network objects, but it isn't necessary to look at objects anyway. An object can also just be looked at by calling its name as if it was a function.
@@ -85,7 +88,7 @@ Thresholds need to be set on a case-by-case basis, and due to external evidence.
 
 mbk3EPnet %>%  # select the mbk3EPnet graph
   activate(edges) %>%  # select the edgelist for transformation
-  filter(weight >= 4) %>% # with filter we select all edges that have a weight of 4 or more 
+  filter(weight >= 3) %>% # with filter we select all edges that have a weight of 4 or more 
   ggraph( layout = "stress") + # pass the transformed graph straight to the plotting environment. N.B. the changes are plotted but not saved to mbk3EPnet!
     geom_edge_link(aes(color = weight), alpha = 0.5) +  # with aes(), we give aesthetic instructions. Here, we tell ggraph to color the edges according to their weight...
     scale_edge_color_continuous(low = "lightgrey", high = "red") + # ...from light grey to red 
@@ -207,7 +210,7 @@ If the degree centrality is weighted, it is the sum of the weight of the edges a
 threshgraph %>% 
    activate(nodes) %>% # select nodes for further transformation
    mutate(deg = centrality_degree(), # add a column called 'deg' to the node list, which contains degree centrality
-          wdeg = centrality_degree() # add a column that contains weighted degree centrality
+          wdeg = centrality_degree(weights = weight) # add a column that contains weighted degree centrality
           )
 ```
 
@@ -352,7 +355,7 @@ It would be important to check now in how far the centrality measures are correl
 ## Edge betweenness
 
 Betweenness can not only be calculated for nodes but also for edges. The process is the same, but now the focus is on how many paths an edge lies. If an edge is important for many paths it has a high edge betweenness. Those edges tend to be the connections between different subgroups.
-When weights are taken into account those edges with a stronger weight are often the ones with the highest betweenness as they are prefered for the pathing.
+When weights are taken into account the edge betweenness function takes a higher edge weight as meaning a greater distance. So we have to invert it here, because in our case it is exactly the other way round.
 
 ```{r edge betweenness}
 # Unweighted
@@ -393,6 +396,6 @@ ggraph (threshgraph,layout = "stress")+
 
 ```
 
-These graphs show us that high edge betweenness is not on high weight edges, but tends to follow low-weight edges external to the centre of the graph. If we had a graph with groups, then this is likely where we would see another group connected.
+These graphs show us that high edge betweenness is not on high weight edges, but tends to follow low-weight edges external to the centre of the graph. If we had a graph with groups, then this is likely where we would see another group connected. 
 
 Many more measures can be applied to a graph, and it often depends on what you want to find out, what your data is like, and what your network ties are built on. But now you should know how to go about it. In the next part, we will show you how to compare networks in order to look at change.

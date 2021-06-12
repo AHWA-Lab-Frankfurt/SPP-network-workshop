@@ -6,7 +6,8 @@ date: "2 - June - 2021"
 output: html_document
 ---
 ```{r libraries, echo=FALSE, warning=FALSE, message=FALSE}
-# this code chunk contains all the libraries we need to use in this process. If they are not present, use install.packages("pacakge x") to get them.
+# this code chunk contains all the libraries we need to use in this process. If they are not present, use install.packages("package x") to get them.
+# install.packages("tidyverse")
 library(tidyverse)
 ```
 
